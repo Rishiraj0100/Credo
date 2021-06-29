@@ -53,9 +53,9 @@ class BotSettings(commands.Cog):
         try:
             await self.bot.set_guild_prefixes(ctx.guild, current_prefixes)
         except Exception as e:
-            await ctx.send(f'{emote.error} {e}')
+            await ctx.send(f'{self.bot.emote.error} {e}')
         else:
-            await ctx.send(emote.tick)
+            await ctx.send(self.bot.emote.tick)
 
     @prefix_add.error
     async def prefix_add_error(self, ctx, error):
@@ -80,9 +80,9 @@ class BotSettings(commands.Cog):
         try:
             await self.bot.set_guild_prefixes(ctx.guild, current_prefixes)
         except Exception as e:
-            await ctx.send(f'{emote.error} {e}')
+            await ctx.send(f'{self.bot.emote.error} {e}')
         else:
-            await ctx.send(emote.tick)
+            await ctx.send(self.bot.emote.tick)
 
 
 ##########################################################################################################
@@ -136,7 +136,7 @@ class BotSettings(commands.Cog):
         if data == False:
             raise expectations.NotSetup
         await ctx.db.execute('UPDATE public.server_configs SET automeme_channel_id = $2,automeme_toogle = $3 WHERE guild_id = $1', ctx.guild.id, channel.id,True)
-        await ctx.send(f'{emote.tick} | Successfully Setuped Automeme Channel To {channel.mention}')
+        await ctx.send(f'{self.bot.emote.tick} | Successfully Setuped Automeme Channel To {channel.mention}')
 
     @config.command(name='autorole-set-human')
     @commands.has_permissions(manage_guild=True)
@@ -149,12 +149,12 @@ class BotSettings(commands.Cog):
             raise expectations.NotSetup
         botrole = discord.utils.get(ctx.guild.roles,name="TEA BOT")
         if role.position > botrole.position:
-            await ctx.send(f'{emote.error} | My Role Is Not Above The Mentioned Role, Please Put My Role Above The Mentioned Role And Try Again')
+            await ctx.send(f'{self.bot.emote.error} | My Role Is Not Above The Mentioned Role, Please Put My Role Above The Mentioned Role And Try Again')
             return
         else:
             pass
         await ctx.db.execute('UPDATE public.server_configs SET autorole_human = $2,autorole_human_toggle = $3 WHERE guild_id = $1', ctx.guild.id, role.id,True)
-        await ctx.send(f'{emote.tick} | Successfully Set Autorole For Humans To {role.name}')
+        await ctx.send(f'{self.bot.emote.tick} | Successfully Set Autorole For Humans To {role.name}')
 
 
     @config.command(name='autorole-set-bot')
@@ -168,12 +168,12 @@ class BotSettings(commands.Cog):
             raise expectations.NotSetup
         botrole = discord.utils.get(ctx.guild.roles,name="TEA BOT")
         if role.position > botrole.position:
-            await ctx.send(f'{emote.error} | My Role Is Not Above The Mentioned Role, Please Put My Role Above The Mentioned Role And Try Again')
+            await ctx.send(f'{self.bot.emote.error} | My Role Is Not Above The Mentioned Role, Please Put My Role Above The Mentioned Role And Try Again')
             return
         else:
             pass
         await ctx.db.execute('UPDATE public.server_configs SET autorole_bot = $2,autorole_bot_toggle = True WHERE guild_id = $1', ctx.guild.id, role.id,True)
-        await ctx.send(f'{emote.tick} | Successfully Set Autorole For Bots To {role.name}')
+        await ctx.send(f'{self.bot.emote.tick} | Successfully Set Autorole For Bots To {role.name}')
 
     @config.command(name='toggle')
     @commands.has_permissions(manage_guild=True)
@@ -195,41 +195,41 @@ class BotSettings(commands.Cog):
         if args == 'autorole':
             if data['autorole_toggle'] == False:
                 await ctx.db.execute('UPDATE public.server_configs SET autorole_toggle = $1 WHERE guild_id = $2',True,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Enabled Autorole')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Enabled Autorole')
                 return
             else:
                 await ctx.db.execute('UPDATE public.server_configs SET autorole_toggle = $1 WHERE guild_id = $2',False,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Disabled Autorole')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Disabled Autorole')
                 return
         elif args == 'autorole-human':
             if data['autorole_human_toggle'] == False:
                 await ctx.db.execute('UPDATE public.server_configs SET autorole_human_toggle = $1 WHERE guild_id = $2',True,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Enabled Autorole For Humans')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Enabled Autorole For Humans')
                 return
             else:
                 await ctx.db.execute('UPDATE public.server_configs SET autorole_human_toggle = $1 WHERE guild_id = $2',False,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Disabled Autorole For Humans')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Disabled Autorole For Humans')
                 return
         elif args == 'autorole-bot':
             if data['autorole_bot_toggle'] == False:
                 await ctx.db.execute('UPDATE public.server_configs SET autorole_bot_toggle = $1 WHERE guild_id = $2',True,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Enabled Autorole For Bots')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Enabled Autorole For Bots')
                 return
             else:
                 await ctx.db.execute('UPDATE public.server_configs SET autorole_bot_toggle = $1 WHERE guild_id = $2',False,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Disabled Autorole For Bots')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Disabled Autorole For Bots')
                 return
         elif args == 'automeme':
             if data['automeme_toogle'] == False:
                 await ctx.db.execute('UPDATE public.server_configs SET automeme_toogle = $1 WHERE guild_id = $2',True,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Enabled Automeme')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Enabled Automeme')
                 return
             else:
                 await ctx.db.execute('UPDATE public.server_configs SET automeme_toogle = $1 WHERE guild_id = $2',False,ctx.guild.id)
-                await ctx.send(f'{emote.tick} | Successfully Disabled Automeme')
+                await ctx.send(f'{self.bot.emote.tick} | Successfully Disabled Automeme')
                 return
         else:
-            await ctx.send(f'{emote.error} | Thats Not A Valid Argument Please Choose A valid Argument')
+            await ctx.send(f'{self.bot.emote.error} | Thats Not A Valid Argument Please Choose A valid Argument')
             await ctx.send_help(ctx.command)
 
 def setup(bot):
