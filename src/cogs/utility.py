@@ -1,9 +1,9 @@
-import discord,random,asyncio,datetime,requests,re,requests,mystbin,time,zipfile,aiohttp,pyfiglet
+import discord,random,asyncio,datetime,requests,re,requests,mystbin,time,zipfile,aiohttp
 from discord.ext import commands
 from .utils import menus
 from datetime import datetime, timedelta
 from .utils.util import date,WrappedMessageConverter
-from .utils import emote,times,formats
+from .utils import times,formats
 from collections import Counter
 from disputils import BotEmbedPaginator
 from io import BytesIO
@@ -147,17 +147,17 @@ class Utility(commands.Cog, name='Utility'):
         try:
             name = await self.bot.wait_for('message', timeout=30.0, check=check)
         except asyncio.TimeoutError:
-            return await ctx.send( f'{emote.error} | You took long. Goodbye.')
+            return await ctx.send( f'{self.bot.emote.error} | You took long. Goodbye.')
         
         if len(name.content) >= 250:
-            return await ctx.send(f'{emote.error} | Title Must Be Less Than 250 Chracters')
+            return await ctx.send(f'{self.bot.emote.error} | Title Must Be Less Than 250 Chracters')
         await ctx.send(f'Sweat. So the name is {name.content}. What about the content? ' \
                        f'**You can type {ctx.prefix}abort to abort the embed make process.**')
 
         try:
             msg = await self.bot.wait_for('message', check=check, timeout=300.0)
         except asyncio.TimeoutError:
-            return await ctx.send( f'{emote.error} | You took too long. Goodbye.')
+            return await ctx.send( f'{self.bot.emote.error} | You took too long. Goodbye.')
         
         if msg.content == f'{ctx.prefix}abort':
             return await ctx.send('Aborting.')
@@ -168,7 +168,7 @@ class Utility(commands.Cog, name='Utility'):
             clean_content = msg.content
 
         if len(clean_content) >= 2000:
-            return await ctx.send(f'{emote.error} | Description Must Be Less Than 2000 Chracters')
+            return await ctx.send(f'{self.bot.emote.error} | Description Must Be Less Than 2000 Chracters')
 
         em = discord.Embed(title=name.content, description=clean_content,color=self.bot.color)
         await ctx.send(embed=em)
@@ -216,8 +216,8 @@ class Utility(commands.Cog, name='Utility'):
 
         channel_info = []
         key_to_emoji = {
-            discord.TextChannel: f'{emote.text_channel}',
-            discord.VoiceChannel: f'{emote.voice_channel}',
+            discord.TextChannel: f'{self.bot.emote.text_channel}',
+            discord.VoiceChannel: f'{self.bot.emote.voice_channel}',
         }
         for key, total in totals.items():
             secrets = secret[key]
@@ -252,7 +252,7 @@ class Utility(commands.Cog, name='Utility'):
 
         for feature, label in all_features.items():
             if feature in features:
-                info.append(f'{emote.tick}: {label}')
+                info.append(f'{self.bot.emote.tick}: {label}')
 
         if info:
             e.add_field(name='Features', value='\n'.join(info))
@@ -958,7 +958,7 @@ class Utility(commands.Cog, name='Utility'):
     @poll.error
     async def poll_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(f'{emote.xmark} | Missing the question.')
+            return await ctx.error(f'Missing the question.')
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -970,13 +970,13 @@ class Utility(commands.Cog, name='Utility'):
         """
 
         if len(questions_and_choices) < 3:
-            return await ctx.send(f'{emote.xmark} | Need at least 1 question with 2 choices.')
+            return await ctx.error(f'Need at least 1 question with 2 choices.')
         elif len(questions_and_choices) > 21:
-            return await ctx.send(f'{emote.xmark} | You can only have up to 20 choices.')
+            return await ctx.error(f'You can only have up to 20 choices.')
 
         perms = ctx.channel.permissions_for(ctx.me)
         if not (perms.read_message_history or perms.add_reactions):
-            return await ctx.send(f'{emote.xmark} | Need Read Message History and Add Reactions permissions.')
+            return await ctx.error(f'Need Read Message History and Add Reactions permissions.')
 
         question = questions_and_choices[0]
         choices = [(to_emoji(e), v) for e, v in enumerate(questions_and_choices[1:])]
@@ -1000,12 +1000,12 @@ class Utility(commands.Cog, name='Utility'):
         ctx.session = aiohttp.ClientSession()
         async with ctx.session.get(url, params={'term': word}) as resp:
             if resp.status != 200:
-                return await ctx.send(f'{emote.error} | An error occurred: {resp.status} {resp.reason}')
+                return await ctx.send(f'{self.bot.emote.error} | An error occurred: {resp.status} {resp.reason}')
 
             js = await resp.json()
             data = js.get('list', [])
             if not data:
-                return await ctx.send(f'{emote.xmark} | No results found for: `{word}`')
+                return await ctx.error(f'No results found for: `{word}`')
 
         pages = TeaPages(UrbanDictionaryPageSource(data))
         try:
@@ -1046,7 +1046,7 @@ class Utility(commands.Cog, name='Utility'):
     # @commands.command()
     # async def ascii(self,ctx, *, text):
     #     if len(text) >= 16:
-    #         await ctx.send(f'{emote.error} | You Cannot Use More thank 16 Characteres')
+    #         await ctx.send(f'{self.bot.emote.error} | You Cannot Use More thank 16 Characteres')
     #     result = pyfiglet.figlet_format(text)
 
     #     embed = discord.Embed(description=f"```{result}```",color= self.bot.color)
