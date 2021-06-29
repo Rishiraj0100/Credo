@@ -3,7 +3,7 @@
 import discord
 from discord.ext import commands
 from .utils.util import traceback_maker,clean_code
-from .utils.emote import tick, error
+# from .utils.emote import tick, error
 import traceback
 import io
 from .utils.paginitators import Pag, TeaPages,TextPageSource,TeaPages
@@ -46,7 +46,7 @@ class Owner_Commands(commands.Cog):
         """Load any extension"""
         try:
             self.bot.load_extension(f"cogs.{name}")
-            await ctx.send(f"{tick} | Loaded extension **{name}**")
+            await ctx.send(f"{self.bot.emote.tick} | Loaded extension **{name}**")
         except Exception as e:
             return await ctx.send(traceback_maker(e))
 
@@ -58,7 +58,7 @@ class Owner_Commands(commands.Cog):
             self.bot.unload_extension(f"cogs.{name}")
         except Exception as e:
             return await ctx.send(traceback_maker(e))
-        await ctx.send(f"{tick} | Unloaded extension **{name}**")
+        await ctx.send(f"{self.bot.emote.tick} | Unloaded extension **{name}**")
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -68,7 +68,7 @@ class Owner_Commands(commands.Cog):
             self.bot.reload_extension(f"cogs.{name}")
         except Exception as e:
             return await ctx.send(traceback_maker(e))
-        await ctx.send(f"{tick} | Reloaded extension **{name}**")
+        await ctx.send(f"{self.bot.emote.tick} | Reloaded extension **{name}**")
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -252,9 +252,9 @@ class Owner_Commands(commands.Cog):
                         ' in a command you used, I do not monitor this DM.__**'
         try:
             await user.send(fmt)
-            await ctx.send(f'{tick} | PM successfully sent.')
+            await ctx.send(f'{self.bot.emote.tick} | PM successfully sent.')
         except:
-            await ctx.send(f'{error} | Could not PM user by ID {user_id}.')
+            await ctx.send(f'{self.bot.emote.error} | Could not PM user by ID {user_id}.')
         
     
     @commands.command(hidden=True)
@@ -293,6 +293,39 @@ class Owner_Commands(commands.Cog):
         await channel.send(embed=em)
         # await ctx.message.delete()
         await ctx.send(':thumbsup:')
+
+    @commands.command(hidden=True)
+    @commands.is_owner()
+    @commands.bot_has_permissions(send_messages=True)
+    async def logsdiscord(self,ctx):
+        with open('discord.log','r') as f:
+            content = f.read()
+        mystbin_client = self.bot.binclient
+        paste = await mystbin_client.post(content,syntax="log")
+        url = paste.url
+        await ctx.send(url)
+
+    @commands.command(hidden=True)
+    @commands.is_owner()
+    @commands.bot_has_permissions(send_messages=True)
+    async def logstortoisedb(self,ctx):
+        with open('tortoisedb.log','r') as f:
+            content = f.read()
+        mystbin_client = self.bot.binclient
+        paste = await mystbin_client.post(content,syntax="log")
+        url = paste.url
+        await ctx.send(url)
+
+    @commands.command(hidden=True)
+    @commands.is_owner()
+    @commands.bot_has_permissions(send_messages=True)
+    async def nohuplogs(self,ctx):
+        with open('nohup.out','r') as f:
+            content = f.read()
+        mystbin_client = self.bot.binclient
+        paste = await mystbin_client.post(content,syntax="out")
+        url = paste.url
+        await ctx.send(url)
 
 def setup(bot):
     bot.add_cog(Owner_Commands(bot))
