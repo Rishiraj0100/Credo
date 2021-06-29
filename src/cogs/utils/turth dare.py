@@ -84,7 +84,7 @@ truths = [
     'What is something that you have never told anyone?',
     'What is the most disgusting habit you have?'
 ]
-daers = [
+dares = [
     'Do 100 squats.',
     'Show the most embarrassing photo on your phone.',
     'Give a foot massage to the person on your right.',
