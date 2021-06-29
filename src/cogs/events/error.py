@@ -1,8 +1,6 @@
 import discord
 from discord.ext import commands
 from discord.ext.commands import errors
-from ..utils.emote import xmark,error
-from ..utils.replies import NEGATIVE_REPLIES,ERROR_REPLIES
 import random
 from ..utils import expectations
 class Error(commands.Cog,name='Error'):
@@ -21,12 +19,12 @@ class Error(commands.Cog,name='Error'):
         elif isinstance(error, commands.MissingPermissions):
             permissions = '\n'.join(
                 [f'> {permission}' for permission in error.missing_perms])
-            message = f'{random.choice(ERROR_REPLIES)} | You Are missing **`{permissions}`** permissions to run the command.'
+            message = f'{random.choice(self.bot.replies.ERROR_REPLIES)} | You Are missing **`{permissions}`** permissions to run the command.'
             
             await ctx.error(message)
         
         elif isinstance(error, errors.MissingRequiredArgument):
-            await ctx.error(f'{random.choice(NEGATIVE_REPLIES)} | You missed the `{error.param.name}` argument.')
+            await ctx.error(f'{random.choice(self.bot.replies.NEGATIVE_REPLIES)} | You missed the `{error.param.name}` argument.')
             helper = str(ctx.invoked_subcommand) if ctx.invoked_subcommand else str(
                 ctx.command)
             return await ctx.send_help(helper)
@@ -34,12 +32,12 @@ class Error(commands.Cog,name='Error'):
         elif isinstance(error, commands.BotMissingPermissions):
             permissions = '\n'.join(
                 [f'> {permission}' for permission in error.missing_perms])
-            message = f'I am missing **`{permissions}`** permissions to run the command `{ctx.command}`.\n'
+            message = f'{random.choice(self.bot.replies.ERROR_REPLIES)} | I am missing **`{permissions}`** permissions to run the command `{ctx.command}`.\n'
             try:
                 await ctx.error(message)
             except discord.Forbidden:
                 try:
-                    await ctx.author.error(f"Hey It looks like, I can't error messages in that channel.\nAlso I am misssing **`{permissions}`** permissions to run the command.")
+                    await ctx.author.error(f"Hey It looks like, I can't send messages in that channel.\nAlso I am misssing **`{permissions}`** permissions to run the command.")
                 except discord.Forbidden:
                     pass
             return
@@ -81,7 +79,7 @@ class Error(commands.Cog,name='Error'):
             await ctx.error(f"This command is on cooldown. Try again in {error.retry_after:.2f} seconds.")
             return
         elif isinstance(error, commands.MissingRole):
-            return await ctx.error(f"You need `{error.missing_role}` role to use this command.")
+            return await ctx.error(f"{random.choice(self.bot.replies.ERROR_REPLIES)} | You need `{error.missing_role}` role to use this command.")
         elif isinstance(error, commands.MaxConcurrencyReached):
             return await ctx.error(f"This command is already running in this server. You have wait for it to finish.")
 
