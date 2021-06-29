@@ -2,7 +2,7 @@ from discord.ext import commands
 import asyncio
 import discord
 import io
-from . import emote
+from .confirmater import ConfirmationPrompt
 
 class _ContextDBAcquire:
     __slots__ = ('ctx', 'timeout')
@@ -26,6 +26,8 @@ class Context(commands.Context):
         super().__init__(**kwargs)
         self.pool = self.bot.db
         self._db = None
+        self.emote = self.bot.emote
+        self.regex = self.bot.regex
 
     # async def entry_to_code(self, entries):
     #     width = max(len(a) for a, b in entries)
@@ -91,91 +93,16 @@ class Context(commands.Context):
         finally:
             await self.acquire()
 
-    # async def prompt(self, message, *, timeout=60.0, delete_after=True, reacquire=True, author_id=None):
-    #     """An interactive reaction confirmation dialog.
-    #     Parameters
-    #     -----------
-    #     message: str
-    #         The message to show along with the prompt.
-    #     timeout: float
-    #         How long to wait before returning.
-    #     delete_after: bool
-    #         Whether to delete the confirmation message after we're done.
-    #     reacquire: bool
-    #         Whether to release the database connection and then acquire it
-    #         again when we're done.
-    #     author_id: Optional[int]
-    #         The member who should respond to the prompt. Defaults to the author of the
-    #         Context's message.
-    #     Returns
-    #     --------
-    #     Optional[bool]
-    #         ``True`` if explicit confirm,
-    #         ``False`` if explicit deny,
-    #         ``None`` if deny due to timeout
-    #     """
-
-    #     if not self.channel.permissions_for(self.me).add_reactions:
-    #         raise RuntimeError('Bot does not have Add Reactions permission.')
-
-    #     fmt = f'{message}\n\nReact with \N{WHITE HEAVY CHECK MARK} to confirm or \N{CROSS MARK} to deny.'
-
-    #     author_id = author_id or self.author.id
-    #     msg = await self.send(fmt)
-
-    #     confirm = None
-
-    #     def check(payload):
-    #         nonlocal confirm
-
-    #         if payload.message_id != msg.id or payload.user_id != author_id:
-    #             return False
-
-    #         codepoint = str(payload.emoji)
-
-    #         if codepoint == '\N{WHITE HEAVY CHECK MARK}':
-    #             confirm = True
-    #             return True
-    #         elif codepoint == '\N{CROSS MARK}':
-    #             confirm = False
-    #             return True
-
-    #         return False
-
-    #     for emoji in ('\N{WHITE HEAVY CHECK MARK}', '\N{CROSS MARK}'):
-    #         await msg.add_reaction(emoji)
-
-    #     if reacquire:
-    #         await self.release()
-
-    #     try:
-    #         await self.bot.wait_for('raw_reaction_add', check=check, timeout=timeout)
-    #     except asyncio.TimeoutError:
-    #         confirm = None
-
-    #     try:
-    #         if reacquire:
-    #             await self.acquire()
-
-    #         if delete_after:
-    #             await msg.delete()
-    #     finally:
-    #         return confirm
-
-    # def tick(self, opt, label=None):
-    #     lookup = {
-    #         True: '<:greenTick:330090705336664065>',
-    #         False: '<:redTick:330090723011592193>',
-    #         None: '<:greyTick:563231201280917524>',
-    #     }
-    #     emoji = lookup.get(opt, '<:redTick:330090723011592193>')
-    #     if label is not None:
-    #         return f'{emoji}: {label}'
-    #     return emoji
-
     @property
     def db(self):
         return self._db if self._db else self.pool
+
+    @property
+    def emote(self):
+        return self.emote
+    @property
+    def regex(self):
+        return self.regex
 
     async def _acquire(self, timeout):
         if self._db is None:
@@ -234,12 +161,16 @@ class Context(commands.Context):
     
     async def error(self, message, delete_after=None):
         return await self.send(
-            embed=discord.Embed(description=f'{emote.error} | {message}', color=self.bot.color),
+            embed=discord.Embed(description=f'{self.emote.error} | {message}', color=self.bot.color),
             delete_after=delete_after,
         )
         
     async def success(self, message, delete_after=None):
         return await self.send(
-            embed=discord.Embed(description=f'{emote.tick} | {message}', color=self.bot.color),
+            embed=discord.Embed(description=f'{self.emote.tick} | {message}', color=self.bot.color),
             delete_after=delete_after,
         )
+
+    async def prompt(self,ctx):
+        confirmation = ConfirmationPrompt(ctx,self.bot.color)
+        return confirmation
