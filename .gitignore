@@ -4,3 +4,4 @@ config.py
 __pycache__
 tortoisedb.log
 discord.log
+prefixes.json
