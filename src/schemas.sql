@@ -1,9 +1,8 @@
 --------------------------Tea Bot-------------------------
 -- imp
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE SCHEMA IF NOT EXISTS smanager;
-
+ 
 
 CREATE TABLE IF NOT EXISTS smanager.custom_data(
     c_id SERIAL NOT NULL,
@@ -33,7 +32,6 @@ CREATE TABLE IF NOT EXISTS smanager.custom_data(
     open_on_thursday BOOLEAN DEFAULT(TRUE),
     open_on_friday BOOLEAN DEFAULT(TRUE),
     open_on_saturday BOOLEAN DEFAULT(TRUE),
-    team_names character varying[],
     auto_slot_list_send BOOLEAN DEFAULT(FALSE),
     auto_delete_on_reject BOOLEAN DEFAULT(FALSE),
     open_message_embed character varying DEFAULT('{
