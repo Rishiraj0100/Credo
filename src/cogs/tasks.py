@@ -26,7 +26,7 @@ class Tasks(commands.Cog):
             em.set_image(url=meme.image_url)
             em.set_footer(text=f'👍 {meme.upvotes} 👎 {meme.downvotes}')
             channel_id = []
-            record = await self.bot.db.fetch('SELECT automeme_channel_id FROM public.server_configs WHERE automeme_toogle = $1',True)   
+            record = await self.bot.db.fetch('SELECT automeme_channel_id FROM server_configs WHERE automeme_toogle = $1',True)   
             if not record:return
             for res in record:
                 r = res['automeme_channel_id']
