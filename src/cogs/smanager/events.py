@@ -1,26 +1,69 @@
 import discord,re
-from discord.ext import commands
+from discord.ext import commands,tasks
 from ..utils import emote
 from prettytable import PrettyTable,ORGMODE
 import json
 from .sutils import delete_denied_message
+import asyncio
+from models import *
+from .sutils import (
+    check_scrim_requirements,
+    find_team,
+    makeslotlist,
+    add_role_and_reaction,
+    available_to_reserve
+    )
+from typing import NamedTuple
 
+
+QueueMessage = NamedTuple("QueueMessage", [("scrim", ScrimData), ("message", discord.Message)])
 
 class EsportsListners(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.scrim_data = {}
+        self.scrim_queue = asyncio.Queue()
+        self.scrim_registration.start()
     
+####################################################################################################################
+#============================================= scrims registration worker =========================================#
+####################################################################################################################
+    @tasks.loop(seconds=2, reconnect=True)
+    async def scrim_registration(self):
+        while not self.scrim_queue.empty():
+            queue_message: QueueMessage = await self.scrim_queue.get()
+            scrim, message = queue_message.scrim, queue_message.message
+            ctx = await self.bot.get_context(message)
+            teamname = find_team(message)
+            scrim = await ScrimData.get_or_none(pk=scrim.id)
+            if not scrim or not scrim.is_running:  # Scrim is deleted or not opened yet.
+                continue
+
+            try:
+                slot_num = scrim.available_slots[0]
+            except IndexError:
+                continue
+
+            slot = await AssignedSlot.create(
+                user_id=ctx.author.id, team_name=teamname, num=slot_num, message_id=message.id
+            )
+            await scrim.assigned_slots.add(slot)
+            await ScrimData.filter(pk=scrim.id).update(available_slots=ArrayRemove("available_slots", slot_num))
+            self.bot.loop.create_task(add_role_and_reaction(ctx, scrim.correctregrole))
+            self.bot.dispatch("correct_reg_logs",message,teamname)
+            if len(scrim.available_slots) == 1:
+                self.bot.dispatch("auto_close_reg",scrim.reg_ch)
 
 ####################################################################################################################
 #============================================= scrims manager registrations processes =============================#
 ####################################################################################################################
-    @commands.Cog.listener()
-    async def on_message(self,message):
+    @commands.Cog.listener(name = "on_message")
+    async def on_scrims_reg(self,message):
         if not message.guild or message.author.bot:
             return
         # print('entered')
-        scrims = await self.bot.db.fetchrow(f'SELECT * FROM smanager.custom_data WHERE reg_ch = $1 AND toggle = $2',message.channel.id,True)
+        scrims = await ScrimData.get_or_none(
+            reg_ch=message.channel.id,
+        )
         if not scrims:
             # print('not scrims')
             return 
@@ -35,64 +78,18 @@ class EsportsListners(commands.Cog):
                 return
             return
 
-        elif scrims['is_running'] == False:
+        elif scrims.is_running == False:
             if scrims['auto_delete_on_reject'] == True:
                 self.bot.loop.create_task(delete_denied_message(message))
             return await message.reply(f'{emote.error} | Registration Has Not Opend Yet',delete_after=10)
-            
 
-        
-        elif len([mem for mem in message.mentions]) == 0 or len([mem for mem in message.mentions]) < scrims['num_correct_mentions']:
-            if scrims['auto_delete_on_reject'] == True:
-                self.bot.loop.create_task(delete_denied_message(message))
-                self.bot.dispatch("deny_reg",message,"insufficient_mentions")
-                return
-            return self.bot.dispatch("deny_reg",message,"insufficient_mentions")
         else:
-            for mem in message.mentions:
-                if mem.bot in message.mentions:
-                    if scrims['auto_delete_on_reject'] == True:
-                        self.bot.loop.create_task(delete_denied_message(message))
-                        self.bot.dispatch("deny_reg",message,"mentioned_bot")
-                        return
-                    return self.bot.dispatch("deny_reg",message,"mentioned_bot")
-                else:pass
+            if not await check_scrim_requirements(self.bot, message, scrims):
+                return
 
-            team_name = re.search(r"team.*", message.content.lower())
-            if team_name is None:
-                return f"{message.author}'s team"
+            self.scrim_queue.put_nowait(QueueMessage(scrims, message))
 
-            team_name = re.sub(r"<@*#*!*&*\d+>|team|name|[^\w\s]", "", team_name.group()).strip()
 
-            team_name = f"Team {team_name.title()}" if team_name else f"{message.author}'s team"
-
-            if team_name in self.scrim_data[scrims['c_id']]["team_name"]:
-                if scrims['auto_delete_on_reject'] == True:
-                    self.bot.loop.create_task(delete_denied_message(message))
-                    self.bot.dispatch("deny_reg",message,"allready_registerd")
-                    return
-                return self.bot.dispatch("deny_reg",message,"allready_registerd")
-            else:
-
-                self.scrim_data[scrims['c_id']]['counter'] = self.scrim_data[scrims['c_id']]['counter'] - 1
-
-                self.scrim_data[scrims['c_id']]['team_name'].append(f"{team_name}")
-                if self.scrim_data[scrims['c_id']]['counter'] == 0:
-                    self.bot.dispatch("auto_close_reg",message.channel.id)
-                
-
-                role = discord.utils.get(message.guild.roles, id = scrims['correct_reg_role'])
-                try:
-                    await message.author.add_roles(role)
-                    
-                except:
-                    pass
-                # print('updated cache')
-                try:
-                    await message.add_reaction(f'{emote.tick}')
-                except:
-                    pass
-                self.bot.dispatch("correct_reg_logs",message,team_name)
 
 ####################################################################################################################
 #============================================= scrims manager Auto close registration =============================#
@@ -100,58 +97,40 @@ class EsportsListners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_auto_close_reg(self,channel_id):
-        scrims = await self.bot.db.fetchrow('SELECT * FROM smanager.custom_data WHERE reg_ch = $1',channel_id)
-        guild = self.bot.get_guild(scrims['guild_id'])
-        channel = self.bot.get_channel(channel_id)
-        if scrims['open_role'] == None:
-            overwrite = channel.overwrites_for(guild.default_role)
+        scrims = await ScrimData.get(reg_ch=channel_id)
+        if not scrims:return #self.bot.db.fetchrow('SELECT * FROM smanager.custom_data WHERE reg_ch = $1',channel_id)
+        if scrims.open_role == None:
+            overwrite = scrims.reg_ch.overwrites_for(scrims.guild.default_role)
             overwrite.send_messages = False
             overwrite.view_channel = True
             try:
-                await channel.set_permissions(guild.default_role, overwrite=overwrite)
+                await  scrims.reg_ch.set_permissions( scrims.guild.default_role, overwrite=overwrite)
             except:
                 pass
             message = scrims['close_message_embed']
             embed = json.loads(message)
             em = discord.Embed.from_dict(embed)
-            await channel.send(embed = em)
-            self.bot.dispatch("reg_closed_db_update",scrims)
-            self.bot.dispatch("reg_closed_logs",scrims['c_id'],scrims['custom_title'],scrims['custom_num'],scrims['guild_id'])
-            await self.bot.db.execute('UPDATE smanager.custom_data SET is_running = $1, is_registeration_done_today = $2 WHERE reg_ch = $3',False,True,channel.id)
+            await  scrims.reg_ch.send(embed = em)
+            self.bot.dispatch("reg_closed_logs",scrims.c_id,scrims.custom_title,scrims.guild_id)
+            await scrims.update(is_running = False, is_registeration_done_today = True)
+            self.bot.dispatch("slotlist_sender",scrims)
         else:
-            role = guild.get_role(scrims["open_role"])
-            overwrite = channel.overwrites_for(role)
+            role =  scrims.guild.get_role(scrims["open_role"])
+            overwrite =  scrims.reg_ch.overwrites_for(role)
             overwrite.send_messages = False
             overwrite.view_channel = True
             try:
-                await channel.set_permissions(role, overwrite=overwrite)
+                await  scrims.reg_ch.set_permissions(role, overwrite=overwrite)
             except:
                 pass
             message = scrims['close_message_embed']
             embed = json.loads(message)
             em = discord.Embed.from_dict(embed)
-            await channel.send(embed = em)
-            self.bot.dispatch("reg_closed_db_update",scrims)
-            self.bot.dispatch("reg_closed_logs",scrims['c_id'],scrims['custom_title'],scrims['custom_num'],scrims['guild_id'])
-            await self.bot.db.execute('UPDATE smanager.custom_data SET is_running = $1, is_registeration_done_today = $2 WHERE reg_ch = $3',False,True,channel.id)
+            await  scrims.reg_ch.send(embed = em)
+            self.bot.dispatch("reg_closed_logs",scrims.c_id,scrims.custom_title,scrims.guild_id)
+            await scrims.update(is_running = False, is_registeration_done_today = True)
+            self.bot.dispatch("slotlist_sender",scrims)
 
-####################################################################################################################
-#============================================= scrims manager registrations close db update =======================#
-####################################################################################################################
-
-    @commands.Cog.listener()
-    async def on_reg_closed_db_update(self,data):
-        for i in range(data['reserverd_slots']):
-            self.scrim_data[data['c_id']]['team_name'].append('Reserved Slot')
-        # print('yep')
-        # print(self.scrim_data[data['c_id']]['team_name'])
-
-        await self.bot.db.execute('UPDATE smanager.custom_data SET team_names = $1 WHERE c_id = $2',self.scrim_data[data['c_id']]['team_name'],data['c_id'])
-        # print('yep')
-        self.scrim_data.pop(data['c_id'])
-        # print('yep')
-        self.bot.dispatch("slotlist_sender",data)
-        # print('yep')
 
 ####################################################################################################################
 #============================================= scrims manager slotlist sender =====================================#
@@ -159,22 +138,15 @@ class EsportsListners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_slotlist_sender(self,datas):
-        data = await self.bot.db.fetchrow('SELECT * FROM smanager.custom_data WHERE c_id = $1',datas['c_id'])
-        if data['auto_slot_list_send'] == True:
-            slot_table = PrettyTable()
-            slot_table.field_names = ["Slot No.", "Team Name"]
-            slot_table.set_style(ORGMODE)
-            slot_count = 1
-            for message in data['team_names']:
-                slot_table.add_row([f"slot {slot_count}", f"{message}"])
-                slot_count+=1
-
-            embed = discord.Embed(title = f"Slotlist For {data['custom_title']}",description = f'''```py\n{slot_table}\n```''',color = self.bot.color)
-            channel = data['slotlist_ch']
+        data = await ScrimData.get(c_id=datas.c_id)
+        if data.auto_slot_list_send == True:
+            embed = discord.Embed(title = f"Slotlist For {data.custom_title}",description = f'''```py\n{makeslotlist(data)}\n```''',color = self.bot.color)
+            channel = data.slotlistch
             if not channel:return
             ch = self.bot.get_channel(channel)
             await ch.send(embed = embed)
-    
+        else:
+            return
 
     ###################################################################################################################
     #========================================scrims manager Auto Open Listner ========================================#
@@ -182,43 +154,60 @@ class EsportsListners(commands.Cog):
     @commands.Cog.listener()
     async def on_reg_open(self,channel_id):
         # print('extered on_reg_open')
-        channel = await self.bot.fetch_channel(channel_id)
+        data = await ScrimData.get(reg_ch = channel_id)
+        channel = data.regch
         if not channel:return
         else:
-            await self.bot.db.execute(f'UPDATE smanager.custom_data SET is_running = $1,team_names = NULL WHERE reg_ch = $2',True,channel.id)
-            data = await self.bot.db.fetchrow(f"SELECT * FROM smanager.custom_data WHERE reg_ch = $1",channel.id)
-            guild = await self.bot.fetch_guild(data['guild_id'])
-            if not guild:return 
+            oldslots = await data.assigned_slots
+            guild = data.guild
+            if not guild:
+                return await data.delete()
             else:
-                if data['open_role'] == None:
+                await AssignedSlot.filter(id__in=(slot.id for slot in oldslots)).delete()
+                await data.assigned_slots.clear()
+                reserved_count = await data.reserved_slots.all().count()
+                await self.bot.db.execute(
+            """
+            UPDATE public."smanager.scrims_data" SET available_slots = $1 WHERE id = $2
+            """,
+                    await available_to_reserve(data),
+                    data.c_id,
+                )
+                async for slot in data.reserved_slots.all():
+                    assinged_slot = await AssignedSlot.create(
+                        num=slot.num,
+                        team_name=slot.team_name,
+                        jump_url=None,
+                    )
+                    await data.assigned_slots.add(assinged_slot)
+                if data.open_role == None:
                     overwrite = channel.overwrites_for(guild.default_role)
                     overwrite.send_messages = True
                     overwrite.view_channel = True
-                    self.scrim_data[data['c_id']] = {"counter":data['allowed_slots'],"team_name":[]}
                     try:
                         await channel.set_permissions(guild.default_role, overwrite=overwrite)
                     except:
-                        self.bot.dispatch("cannot_open_reg",guild.id,f"I Was Unable To Open Registration For `{data['c_id']}` Because I Don't Have Premission To Manager Channe")
-                        self.scrim_data.pop(data['c_id'])
+                        self.bot.dispatch("cannot_open_reg",guild.id,f"I Was Unable To Open Registration For `{data.c_id}` Because I Don't Have Premission To Manager Channe")
                         return
                     else:
-                        self.bot.dispatch("reg_ch_open_msg",channel.id)
+                        self.bot.dispatch("reg_ch_open_msg",channel.id,reserved_count)
                         self.bot.dispatch("reg_open_msg_logs",channel.id,guild.id)
                 else:
-                    role = guild.get_role(data["open_role"])
+                    role = data.openrole
                     overwrite = channel.overwrites_for(role)
                     overwrite.send_messages = True
                     overwrite.view_channel = True
-                    self.scrim_data[data['c_id']] = {"counter":data['allowed_slots'],"team_name":[]}
                     try:
                         await channel.set_permissions(guild.default_role, overwrite=overwrite)
                     except:
                         self.bot.dispatch("cannot_open_reg",guild.id,f"I Was Unable To Open Registration For `{data['c_id']}` Because I Don't Have Premission To Manager Channe")
-                        self.scrim_data.pop(data['c_id'])
                         return
                     else:
                         self.bot.dispatch("reg_ch_open_msg",channel.id)
                         self.bot.dispatch("reg_open_msg_logs",channel.id,guild.id)
+
+                # await data.update(is_running = True,)#self.bot.db.execute(f'UPDATE smanager.custom_data SET is_running = $1,team_names = NULL WHERE reg_ch = $2',True,channel.id)
+                # data = await self.bot.db.fetchrow(f"SELECT * FROM smanager.custom_data WHERE reg_ch = $1",channel.id)
 
         
 
@@ -227,21 +216,22 @@ class EsportsListners(commands.Cog):
 #====================================================== scrims manager Logs Listeners =============================#
 ####################################################################################################################
     @commands.Cog.listener()
-    async def on_reg_ch_open_msg(self,channel_id):
-        ch = await self.bot.fetch_channel(channel_id)
-        data = await self.bot.db.fetchrow(f"SELECT * FROM smanager.custom_data WHERE reg_ch = $1",ch.id)
-        message = data['open_message_embed']
-        message = message.replace('<<available_slots>>',f"{data['allowed_slots']}")
-        message = message.replace('<<reserved_slots>>',f"{data['reserverd_slots']}")
-        message = message.replace('<<total_slots>>',f"{data['num_slots']}")
-        message = message.replace('<<custom_title>>',f"{data['custom_title']}")
-        message = message.replace('<<mentions_required>>',f"{data['num_correct_mentions']}")
+    async def on_reg_ch_open_msg(self,channel_id,reserved_slots):
+        data = await ScrimData.get(reg_ch = channel_id)
+        message = data.open_message_embed
+        message = message.replace('<<available_slots>>',f"{len(data.allowed_slots)}")
+        message = message.replace('<<reserved_slots>>',f"{reserved_slots}")
+        message = message.replace('<<total_slots>>',f"{data.num_slots}")
+        message = message.replace('<<custom_title>>',f"{data.custom_title}")
+        message = message.replace('<<mentions_required>>',f"{data.num_correct_mentions}")
         embed = json.loads(message)
         em = discord.Embed.from_dict(embed)
-        guild = self.bot.get_guild(data['guild_id'])
-        role = guild.get_role(data["ping_role"])
-        await ch.send(content = role.mention if role else None ,embed=em,allowed_mentions=discord.AllowedMentions(roles=True))
+        role = data.openrole
+        await data.regch.send(content = role.mention if role else None ,embed=em,allowed_mentions=discord.AllowedMentions(roles=True))
 
+####################################################################################################################
+#==================================================================================================================#
+####################################################################################################################
     @commands.Cog.listener()
     async def on_deny_reg(self,message,type,addreact=True):
         if type == "insufficient_mentions":
