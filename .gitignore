@@ -1,10 +1,6 @@
 
 config.py
 .vscode/settings.json
-src/__pycache__
-src/cogs/__pycache__
-src/cogs/events/__pycache__
-src/cogs/mod/__pycache__
-src/cogs/smanager/__pycache__
-src/cogs/utils/__pycache__
-src/prefixes.json
+__pycache__
+tortoisedb.log
+discord.log
