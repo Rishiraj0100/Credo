@@ -1,27 +1,83 @@
-import discord,sys,traceback,asyncpg,jishaku,asyncio,mystbin
+import discord,traceback,jishaku,asyncio,mystbin
 from discord.ext import commands
 from cogs.utils import context
 import config
 from cogs.utils.jsonreaders import Config
 from colorama import Fore,init
 # from .cogs.utils.util import traceback_maker
+from cogs.utils.constants import *  
+from tortoise import Tortoise
+import aiohttp
+import logging
+
+#================ LOGGING ===============#
+
+class RemoveNoise(logging.Filter):
+    def __init__(self):
+        super().__init__(name='discord.state')
+    def filter(self,record):
+        if record.levelname == "WARNING" and 'referencing an unknown' in record.msg:
+            return False
+        return True
+
+
+max_bytes = 32*1024*1024
+logging.getLogger('discord').setLevel(logging.INFO)
+logging.getLogger('discord.http').setLevel(logging.WARNING)
+logging.getLogger('discord.state').addFilter(RemoveNoise())
+
+discord_log = logging.getLogger()
+discord_log.setLevel(logging.INFO)
+discord_handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+discord_handler.setFormatter(logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}',datefmt="%Y-%m-%d %H:%M:%S",style='{'))
+discord_log.addHandler(discord_handler)
+
+fmt = logging.Formatter(
+    fmt="%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+sh = logging.FileHandler(filename='tortoisedb.log', encoding='utf-8', mode='w')
+sh.setLevel(logging.DEBUG)
+sh.setFormatter(fmt)
+
+# will print debug sql
+logger_db_client = logging.getLogger("db_client") 
+logger_db_client.setLevel(logging.DEBUG)
+logger_db_client.addHandler(sh)
+
+logger_tortoise = logging.getLogger("tortoise")
+logger_tortoise.setLevel(logging.DEBUG)
+logger_tortoise.addHandler(sh)
+
 
 init(autoreset=True)
 intents = discord.Intents.default()
 intents.members = True
 
-def get_prefix(bot, msg):
-    user_id = bot.user.id
-    base = [f'<@!{user_id}> ', f'<@{user_id}> ']
-    if msg.guild is None:
-        base.append(config.prefix)
-    else:
-        base.extend(bot.prefixes.get(msg.guild.id,[config.prefix]))
-    return base
+extensions = [
+    'cogs.mod.mod',
+    'cogs.fun',
+    'cogs.utility',
+    'cogs.events.error',
+    'cogs.events.events',
+    'cogs.others',
+    'cogs.top',
+    'cogs.help',
+    'cogs.admin',
+    'cogs.bot_settings',
+    'cogs.tasks',
+    'cogs.smanager.smanager',
+    'cogs.smanager.tasks',
+    'cogs.events.autoevents',
+    'cogs.events.botevents',
+    'jishaku'
+]
+
+
 class TeaBot(commands.Bot):
     def __init__(self, **kwargs):
         super().__init__(
-            command_prefix=get_prefix,
+            command_prefix=self.get_prefix,
             intents=intents,
             strip_after_prefix=True,
             case_insensitive=True,
@@ -47,11 +103,47 @@ class TeaBot(commands.Bot):
         self.loop = asyncio.get_event_loop()
         self.prefixes = Config('prefixes.json')
         self.binclient = mystbin.Client()
+        self.emote = Emotes
+        self.replies = Replies
+        self.colorslist = ColorsList
+        self.regex = Regex
+        # self. = str
+        asyncio.get_event_loop().run_until_complete(self.init_db())
+        for extension in extensions:
+            try:
+                self.load_extension(extension)
+                print(Fore.GREEN + f"{extension} was loaded successfully!")
+            except Exception as e:
+                tb = traceback.format_exception(type(e), e, e.__traceback__)
+                tbe = "".join(tb) + ""
+                print(Fore.RED + f"[WARNING] Could not load extension {extension}: {tbe}")
+                # self.tr = tbe
 
     async def process_commands(self, message):
         ctx = await self.get_context(message,cls=context.Context)
 
         await self.invoke(ctx)
+
+    async def get_prefix(self, msg: discord.Message) -> str:
+        user_id = self.user.id
+        prefix = ['config.prefix',f'<@!{user_id}> ', f'<@{user_id}> ']
+        if msg.author.id == config.owners:
+            prefix = ""
+        else:
+            prefix.extend(self.prefixes.get(msg.guild.id,[config.prefix]))
+        return prefix
+
+    @property
+    def db(self):
+        return Tortoise.get_connection("default")._pool
+
+    async def init_db(self):
+        self.session = aiohttp.ClientSession(loop=self.loop)
+        await Tortoise.init(config.TORTOISE)
+        await Tortoise.generate_schemas(safe=True)
+
+        for mname, model in Tortoise.apps.get("models").items():
+            model.bot = self
 
     def get_guild_prefixes(self, guild, *, local_inject=get_prefix):
         proxy_msg = discord.Object(id=0)
@@ -71,62 +163,25 @@ class TeaBot(commands.Bot):
 
 bot = TeaBot()
 
-# cogs
-extensions = [
-    'cogs.mod.mod',
-    'cogs.fun',
-    'cogs.utility',
-    'cogs.events.error',
-    'cogs.events.events',
-    'cogs.others',
-    'cogs.top',
-    'cogs.help',
-    'cogs.admin',
-    'cogs.bot_settings',
-    'cogs.tasks',
-    'cogs.smanager.smanager',
-    'cogs.smanager.tasks',
-    'cogs.events.autoevents',
-    'cogs.events.botevents'
-]
-
-if __name__ == "__main__":
-    for extension in extensions:
-        try:
-            bot.load_extension(extension)
-            print(Fore.GREEN + f"{extension} was loaded successfully!")
-        except Exception as e:
-            print(Fore.RED+f'Error Loading {extension}', file=sys.stderr)
-            traceback.print_exc()
-
-bot.load_extension("jishaku")
-
 @bot.command(hidden=True)
 @commands.is_owner()
 async def licog(ctx):
     await ctx.send(extensions)
 
-# @bot.command(hidden=True)
-# @commands.is_owner()
-# async def reloadall(slef,ctx):
-#     for extension in extensions:
-#         try:
-#             bot.load_extension(extension)
-#         except Exception as e:
-#             await ctx.send(traceback_maker(e))
-        
-#     await ctx.success(f'Reloaded All Extensions')
 
-async def create_db_pool():
-    bot.db = await asyncpg.create_pool(database=config.postgresqldb, 
-    user=config.postgresqlusername, 
-    password=config.postgresqlpass,
-    host=config.postgresqlhost)
-    print(Fore.RED + '-------------------------------------')
-    print(Fore.GREEN + 'Conected With Databse')
+# async def create_db_pool():
+#     bot.db = await asyncpg.create_pool(database=config.postgresqldb, 
+#     user=config.postgresqlusername, 
+#     password=config.postgresqlpass,
+#     host=config.postgresqlhost)
+#     print(Fore.RED + '-------------------------------------')
+#     print(Fore.GREEN + 'Conected With Databse')
+# bot.loop.create_task(create_db_pool())
 
 
-bot.loop.create_task(create_db_pool())
-
-
-bot.run(config.token)
+try:
+    bot.run(config.token)
+except:
+    print(Fore.RED + "--------------> Killed!! <---------------")
+finally:
+    print(Fore.RED + "--------------> Killed!! <---------------")
