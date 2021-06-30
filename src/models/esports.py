@@ -4,11 +4,12 @@ from typing import Optional
 from .fields import * 
 
 __all__ = (
-    "ScrimData",
-    "TagCheck",
+    "TMSlot",
     "EasyTag",
+    "TagCheck",
+    "ScrimData",
     "AssignedSlot",
-    "ReservedSlot"
+    "ReservedSlot",
 )
 
 class ScrimData(models.Model):
@@ -112,6 +113,8 @@ class BaseSlot(models.Model):
     id = fields.IntField(pk=True)
     num = fields.IntField(null=True)  # this will never be null but there are already records in the table so
     team_name = fields.TextField(null=True)
+    members = ArrayField(fields.BigIntField(), default=list,null=True)
+    leader_id = fields.BigIntField(null=True)
 
 
 class AssignedSlot(BaseSlot):
@@ -119,6 +122,7 @@ class AssignedSlot(BaseSlot):
         table = "assigned_slots"
 
     message_id = fields.BigIntField(null=True)
+    jump_url = fields.TextField(null=True)
 
 
 class ReservedSlot(BaseSlot):
@@ -160,4 +164,69 @@ class EasyTag(models.Model):
     def easytag_ch(self):
         if self.guild is not None:
             return discord.utils.get(self.guild.text_channels, id = self.ch_id)
+
+
+class Tourney(models.Model):
+    class Meta:
+        table = "tm_data"
+
+    id = fields.BigIntField(pk=True, index=True)
+    guild_id = fields.BigIntField()
+    tm_name = fields.CharField(max_length=200, default="TeaBot-tournament")
+    registration_channel_id = fields.BigIntField(index=True)
+    confirm_channel_id = fields.BigIntField()
+    role_id = fields.BigIntField()
+    required_mentions = fields.IntField()
+    total_slots = fields.IntField()
+    open_role_id = fields.BigIntField(null=True)
+    closed = fields.BooleanField(default=False)
+
+    assigned_slots: fields.ManyToManyRelation["TMSlot"] = fields.ManyToManyField("models.TMSlot")
+
+    @property
+    def guild(self) -> Optional[discord.Guild]:
+        return self.bot.get_guild(self.guild_id)
+
+    @property
+    def logschan(self):
+        if self.guild is not None:
+            return discord.utils.get(self.guild.text_channels, name="teabot-tournament-logs")
+
+    @property
+    def registration_channel(self):
+        if self.guild is not None:
+            return self.guild.get_channel(self.registration_channel_id)
+
+    @property
+    def confirm_channel(self):
+        if self.guild is not None:
+            return self.guild.get_channel(self.confirm_channel_id)
+
+    @property
+    def role(self):
+        if self.guild is not None:
+            return self.guild.get_role(self.role_id)
+
+    @property
+    def open_role(self):
+        if self.guild is not None:
+            if self.open_role_id != None:
+                return self.guild.get_role(self.open_role_id)
+            else:
+                return self.guild.default_role
+
+    @property
+    def modrole(self):
+        if self.guild is not None:
+            return discord.utils.get(self.guild.roles, name="teabot-tournament-mod")
+class TMSlot(models.Model):
+    class Meta:
+        table = "tm_Slots"
+
+    id = fields.BigIntField(pk=True)
+    num = fields.IntField()
+    team_name = fields.TextField()
+    leader_id = fields.BigIntField()
+    members = ArrayField(fields.BigIntField(), default=list,null=True)
+    jump_url = fields.TextField(null=True)
 
