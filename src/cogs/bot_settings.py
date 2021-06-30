@@ -92,6 +92,7 @@ class BotSettings(commands.Cog):
     @commands.command()
     @commands.has_permissions(manage_guild=True)
     @commands.bot_has_permissions(manage_guild=True)
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def setup(self,ctx):
         """
         Setups The Bot In your Server
@@ -128,6 +129,7 @@ class BotSettings(commands.Cog):
     
     @config.command(name='automeme-set')
     @commands.has_permissions(manage_guild=True)
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def config_autommeme_set(self,ctx,channel:discord.TextChannel):
         '''
         Turn On Automeme
@@ -140,6 +142,7 @@ class BotSettings(commands.Cog):
 
     @config.command(name='autorole-set-human')
     @commands.has_permissions(manage_guild=True)
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def config_autorole_set_human(self,ctx,role:discord.Role):
         '''
         Sets The Autorole For Human 
@@ -159,6 +162,7 @@ class BotSettings(commands.Cog):
 
     @config.command(name='autorole-set-bot')
     @commands.has_permissions(manage_guild=True)
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def config_autorole_set_bot(self,ctx,role:discord.Role):
         '''
         Sets The Autorole For Bots 

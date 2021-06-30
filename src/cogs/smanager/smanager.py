@@ -30,6 +30,7 @@ class Esports(commands.Cog):
     @smanager.command(name='setup')
     # @is_bot_setuped()
     @commands.has_permissions(administrator=True)
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     @commands.bot_has_permissions(manage_channels=True,manage_roles=True)
     async def smanager_setup(self,ctx):
         '''
@@ -82,6 +83,7 @@ class Esports(commands.Cog):
     @smanager.command(name='setup-custom')
     @commands.has_role('teabot-smanger')
     # @is_smanager_setuped()
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def smanager_setup_custom(self,ctx):
         """
         Setups The Custom In Your Server
@@ -744,6 +746,7 @@ class Esports(commands.Cog):
     
     @tag_check.command(name = 'set')
     @commands.has_role('teabot-smanger')
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def tag_check_set(self,ctx,check_channel:discord.TextChannel,*,mentions_required:int):
         '''
         Setups The Tag Check In You Server
@@ -872,6 +875,7 @@ class Esports(commands.Cog):
 
     @easytag.command(name = 'set')
     @commands.has_permissions(manage_guild = True)
+    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def easytag_set(self,ctx,channel:discord.TextChannel):
         """
         Setups Easy tagging In Your Server
