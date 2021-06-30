@@ -166,7 +166,7 @@ class EasyTag(models.Model):
             return discord.utils.get(self.guild.text_channels, id = self.ch_id)
 
 
-class Tourney(models.Model):
+class Tournament(models.Model):
     class Meta:
         table = "tm_data"
 
@@ -219,6 +219,7 @@ class Tourney(models.Model):
     def modrole(self):
         if self.guild is not None:
             return discord.utils.get(self.guild.roles, name="teabot-tournament-mod")
+            
 class TMSlot(models.Model):
     class Meta:
         table = "tm_Slots"
