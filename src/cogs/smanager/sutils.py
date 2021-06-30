@@ -12,6 +12,7 @@ __all__ = (
     "safe_delete",
     "makeslotlist",
     "ScrimConverter",
+    "EasyTagConverter",
     "already_reserved",
     "TagCheckConverter",
     "available_to_reserve",
@@ -61,6 +62,19 @@ class TagCheckConverter(commands.Converter, TagCheck):
                 pass
 
         raise commands.BadArgument(f"This is not a valid TagCheck ID.\n\nGet a valid ID with `{ctx.prefix}tag_check config`")
+class EasyTagConverter(commands.Converter, EasyTag):
+    async def convert(self, ctx, argument: str):
+        try:
+            argument = int(argument)
+        except ValueError:
+            pass
+        else:
+            try:
+                return await EasyTag.get(pk=argument, guild_id=ctx.guild.id)
+            except tortoise.exceptions.DoesNotExist:
+                pass
+
+        raise commands.BadArgument(f"This is not a valid EasyTag ID.\n\nGet a valid ID with `{ctx.prefix}ez_tag config`")
 
 async def delete_denied_message(message: discord.Message, seconds=10):
     with suppress(discord.HTTPException, discord.NotFound, discord.Forbidden):

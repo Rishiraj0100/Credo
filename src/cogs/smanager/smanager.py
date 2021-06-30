@@ -373,6 +373,7 @@ class Esports(commands.Cog):
         await confirmation.confirm(title = 'Are You Sure?',description = f"Would you like to Delete Custom Info With Custom Id = `{custom_id}`")
         if confirmation.confirmed:
             await data.delete()
+            await confirmation.update(description = f"{ctx.emote.tick} | SuccessFully Deleted")
         else:
             return await confirmation.update(description = f"Not Confirmed", hide_author=True, color=self.bot.color)
 
@@ -820,7 +821,17 @@ class Esports(commands.Cog):
             await ctx.success(f'Successfully disabled tag check for `{data.id}`')
             return
 
-#todo make delete command for tag check
+    @tag_check.command(name = 'delete')
+    @commands.has_role('teabot-smanger')
+    async def tag_check_delete(self,ctx,tag_check_id:TagCheckConverter):
+        data = tag_check_id
+        confirmation = ConfirmationPrompt(ctx, self.bot.color)
+        await confirmation.confirm(title = 'Are You Sure?',description = f"Would you like to Delete Tag Check With Id = `{data.id}`")
+        if confirmation.confirmed:
+            await data.delete()
+            await confirmation.update(description = f"{ctx.emote.tick} | SuccessFully Deleted")
+        else:
+            return await confirmation.update(description = f"Not Confirmed", hide_author=True, color=self.bot.color)
 
 ####################################################################################################################
 #===================================================== Other Commnads =============================================#
@@ -846,7 +857,7 @@ class Esports(commands.Cog):
             allowed_mentions=discord.AllowedMentions(roles=True),
         )
         self.bot.loop.create_task(delete_denied_message(msg, 30 * 60))
-#  Todo: Update These to tortoise
+
 ####################################################################################################################
 #======================================================== Easy Tagging ============================================#
 ####################################################################################################################
@@ -883,27 +894,64 @@ class Esports(commands.Cog):
         await easytag.save()
         await ctx.success(f"succesfully setuped easy tagg in {channel.mention} and you easy tag id is: `{easytag.id}`")
 
-    @easytag.command(name = 'toggle')
+    @easytag.command(name='config')
     @commands.has_permissions(manage_guild = True)
-    async def easytag_toggle(self,ctx):
-        """Toggles Easy Tagging In Server"""
-        data = await self.bot.db.fetchrow('SELECT * FROM smanager.ez_tag WHERE guild_id = $1',ctx.guild.id)
-        if not data:
-            return await ctx.error('You Do Not Easy Tag Setuped') 
-        if data['toggle'] == False:
-            await ctx.db.execute('UPDATE ez_tag SET toggle = $1 WHERE guild_id = $2',True,ctx.guild.id)
-            return await ctx.success('Successfully Turned On Easy Tagging')
+    async def easytag_config(self,ctx):
+        """See The Easy Tag Configuration For This Server"""
+        alleasytag = await EasyTag.filter(guild_id=ctx.guild.id).all()
+
+        if not len(alleasytag):
+            return await ctx.error(f'This server does not have any easy tag check')
+
+        to_paginate = []
+        for idx, easytag in enumerate(alleasytag, start=1):
+            channel = getattr(easytag.easytag_ch, "mention", "`Channel Deleted!`")
+
+            mystring = f"""
+            Easy Tag ID: `{easytag.id}`\n 
+            Channel: `{channel}`\n 
+            """
+
+            to_paginate.append(f"**`<------ {idx:02d} ------>`**\n\n{mystring}\n")
+
+        paginator = Pages(
+            ctx, title="Total Easy Tag Setuped: {}".format(len(to_paginate)), entries=to_paginate, per_page=1, show_entry_count=True
+        )
+
+        await paginator.paginate()
+        
+    @easytag.command(name = 'toggle')
+    @commands.has_role('teabot-smanger')
+    async def easytag_toggle(self,ctx,easy_tag_id:EasyTagConverter):
+        '''
+        Toggles This Easy Tag
+        '''
+        data = easy_tag_id
+
+        if data.toggle == False:
+            await data.update(toggle = True)
+            await ctx.success(f'Successfully enabled easy tag for `{data.id}`')
+            return
         else:
-            await ctx.db.execute('UPDATE ez_tag SET toggle = $1 WHERE guild_id = $2',False,ctx.guild.id)
-            return await ctx.success('Successfully Turned Off Easy Tagging')
+            await data.update(toggle = False)
+            await ctx.success(f'Successfully disabled easy tag for `{data.id}`')
+            return
 
-
+    @easytag.command(name = 'delete')
+    @commands.has_role('teabot-smanger')
+    async def easytag_delete(self,ctx,easy_tag_id:EasyTagConverter):
+        data = easy_tag_id
+        confirmation = ConfirmationPrompt(ctx, self.bot.color)
+        await confirmation.confirm(title = 'Are You Sure?',description = f"Would you like to Delete Easy Tag With Id = `{data.id}`")
+        if confirmation.confirmed:
+            await data.delete()
+            await confirmation.update(description = f"{ctx.emote.tick} | SuccessFully Deleted")
+        else:
+            return await confirmation.update(description = f"Not Confirmed", hide_author=True, color=self.bot.color)
 
 ####################################################################################################################
 #===================================================== Tournament Manager =========================================#
 ####################################################################################################################
-
-
 
 def setup(bot):
     bot.add_cog(Esports(bot))
