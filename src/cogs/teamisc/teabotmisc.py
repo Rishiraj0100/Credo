@@ -2,19 +2,16 @@ import discord
 from discord.ext import commands
 import psutil
 import platform
-from .utils import emote
-from .utils import context as Context
+from ..utils.times import *
 import os,inspect
 from collections import Counter
 from glob import glob
 
 
 
-class Other(commands.Cog, name='Other'):
+class TeaBotMisc(commands.Cog, name='Other'):
     def __init__(self, bot):
         self.bot = bot
-
-    
 
     @commands.command()
     async def stats(self, ctx: commands.Context):
@@ -30,7 +27,7 @@ class Other(commands.Cog, name='Other'):
             latency = round(self.bot.latency*1000)
             e = discord.Embed(title = 'Tea Bot Status', description = f'Bot Name : `Tea Bot#9256`\n`Bot ID: 782875333144870932`',color = self.bot.color,inline=True)
             e.add_field(name = 'General', value = f'```py\nSevers: {serverCount}\nUsers: {memberCount}\n```',inline=True)
-            e.add_field(name = 'Other', value = f'```py\nPython Version: {pythonVersion}\nDiscord.Py Version: {dpyVersion}\nTea Bot Version: 3.4\nCommands: {commandscount}\nLatency: {latency}\n```',inline=True)
+            e.add_field(name = 'Other', value = f'```py\nPython Version: {pythonVersion}\nDiscord.Py Version: {dpyVersion}\nTea Bot Version: 3.4\nCommands: {commandscount}\nLatency: {latency}\nUptime: {self.get_bot_uptime(brief=False)}\nLast Restart: {strtime(self.bot.start_time)}```',inline=True)
             e.add_field(name = 'System', value = f'```py\nOs: {operatingsystem}\nCPU Usage: {cpu_usage}%\nRam Usage: {ram_usage}%\n```',inline=True)
             e.add_field(name = 'Creator', value = f'```\nTier Gamer#0252 [749550694469599233]\n```',inline=True)
             e.set_thumbnail(url = self.bot.logo)
@@ -74,10 +71,10 @@ class Other(commands.Cog, name='Other'):
         e.set_footer(text=f'Author ID: {ctx.author.id}')
 
         await channel.send(embed=e)
-        await ctx.send(f'{emote.tick} | Successfully sent feedback')
+        await ctx.send(f'{ctx.emote.tick} | Successfully sent feedback')
 
     @commands.command(aliases = ['src'])
-    async def source(self, ctx: Context, *, search: str = None):
+    async def source(self, ctx, *, search: str = None):
         """Refer to the source code of the bot commands."""
         source_url = "https://github.com/Tea-Bot-Development/Tea-Bot"
 
@@ -105,7 +102,7 @@ class Other(commands.Cog, name='Other'):
         await ctx.send(embed=em)
 
     @commands.command(aliases=["cs"])
-    async def codestats(self, ctx: Context):
+    async def codestats(self, ctx):
         """See the code statictics of tea bot."""
         ctr = Counter()
         for ctr["files"], f in enumerate(glob("./**/*.py", recursive=True)):
@@ -118,6 +115,7 @@ class Other(commands.Cog, name='Other'):
                     ctr["functions"] += line.startswith("def")
                     ctr["coroutines"] += line.startswith("async def")
                     ctr["docstrings"] += line.startswith('"""') + line.startswith("'''")
+                    ctr["decorators"] += line.startswith("@")
 
             embed=discord.Embed(
                 title="Tea Bot Code Stats",
@@ -126,5 +124,15 @@ class Other(commands.Cog, name='Other'):
             )
         await ctx.send(embed = embed)
 
+    def get_bot_uptime(self, *, brief=False):
+        return human_timedelta(self.bot.start_time, accuracy=None, brief=brief, suffix=False)
+
+    @commands.command()
+    async def uptime(self, ctx):
+        """Do you wonder when did we last restart Quotient?"""
+        await ctx.send(
+            f"**Uptime:** {self.get_bot_uptime(brief=False)}\n**Last Restart:** {strtime(self.bot.start_time)}"
+        )
+
 def setup(bot):
-    bot.add_cog(Other(bot))
+    bot.add_cog(TeaBotMisc(bot))

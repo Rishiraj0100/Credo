@@ -5,6 +5,16 @@ from .formats import plural, human_join
 from discord.ext import commands
 import re
 
+__all__ = (
+    "ShortTime",
+    "HumanTime",
+    "Time",
+    "FutureTime",
+    "UserFriendlyTime",
+    "human_timedelta",
+    "strtime"
+)
+
 # Monkey patch mins and secs into the units
 units = pdt.pdtLocales['en_US'].units
 units['minutes'].append('mins')
@@ -242,3 +252,6 @@ def human_timedelta(dt, *, source=None, accuracy=3, brief=False, suffix=True):
             return human_join(output, final='and') + suffix
         else:
             return ' '.join(output) + suffix
+
+def strtime(target):
+    return target.strftime("%d-%b-%Y %I:%M %p")

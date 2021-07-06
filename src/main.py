@@ -9,6 +9,10 @@ from cogs.utils.constants import *
 from tortoise import Tortoise
 import aiohttp
 import logging
+import pytz
+from datetime import datetime
+
+IST = pytz.timezone("Asia/Kolkata")
 
 #================ LOGGING ===============#
 
@@ -55,21 +59,21 @@ intents = discord.Intents.default()
 intents.members = True
 
 extensions = [
-    'cogs.mod.mod',
-    'cogs.fun',
-    'cogs.utility',
+    # 'cogs.mod.mod',
+    # 'cogs.fun',
+    # 'cogs.utility',
     'cogs.events.error',
     'cogs.events.events',
-    'cogs.others',
-    'cogs.top',
-    'cogs.help',
+    'cogs.teamisc.teabotmisc',
+    # 'cogs.top',
+    # 'cogs.teamisc.help',
     'cogs.admin',
-    'cogs.bot_settings',
-    'cogs.tasks',
-    'cogs.smanager.smanager',
-    'cogs.smanager.tasks',
-    'cogs.events.autoevents',
-    'cogs.events.botevents',
+    # 'cogs.bot_settings',
+    # 'cogs.tasks',
+    # 'cogs.smanager.smanager',
+    # 'cogs.smanager.tasks',
+    # 'cogs.events.autoevents',
+    # 'cogs.events.botevents',
     'jishaku'
 ]
 
@@ -107,6 +111,7 @@ class TeaBot(commands.Bot):
         self.replies = Replies
         self.colorslist = ColorsList
         self.regex = Regex
+        self.start_time = datetime.now(tz=IST)
         # self. = str
         asyncio.get_event_loop().run_until_complete(self.init_db())
         for extension in extensions:
@@ -167,17 +172,6 @@ bot = TeaBot()
 @commands.is_owner()
 async def licog(ctx):
     await ctx.send(extensions)
-
-
-# async def create_db_pool():
-#     bot.db = await asyncpg.create_pool(database=config.postgresqldb, 
-#     user=config.postgresqlusername, 
-#     password=config.postgresqlpass,
-#     host=config.postgresqlhost)
-#     print(Fore.RED + '-------------------------------------')
-#     print(Fore.GREEN + 'Conected With Databse')
-# bot.loop.create_task(create_db_pool())
-
 
 try:
     bot.run(config.token)

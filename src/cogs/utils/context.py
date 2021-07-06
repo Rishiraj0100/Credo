@@ -26,8 +26,8 @@ class Context(commands.Context):
         super().__init__(**kwargs)
         self.pool = self.bot.db
         self._db = None
-        self.emote = self.bot.emote
-        self.regex = self.bot.regex
+        self.emotes = self.bot.emote
+        self.regexs = self.bot.regex
 
     # async def entry_to_code(self, entries):
     #     width = max(len(a) for a, b in entries)
@@ -99,10 +99,10 @@ class Context(commands.Context):
 
     @property
     def emote(self):
-        return self.emote
+        return self.emotes
     @property
     def regex(self):
-        return self.regex
+        return self.regexs
 
     async def _acquire(self, timeout):
         if self._db is None:

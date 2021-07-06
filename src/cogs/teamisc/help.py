@@ -1,9 +1,9 @@
 import discord
 from discord.ext import commands
-from .utils import menus
+from ..utils import menus
 import asyncio
-from .utils.paginitators import TeaPages
-from .utils import emote
+from ..utils.paginitators import TeaPages
+from ..utils import emote
 
 class Prefix(commands.Converter):
     async def convert(self, ctx, argument):
