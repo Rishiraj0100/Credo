@@ -11,8 +11,9 @@ import aiohttp
 import logging
 import pytz
 from datetime import datetime
+from cogs.utils.inputs import *
 
-IST = pytz.timezone("Asia/Kolkata")
+
 
 #================ LOGGING ===============#
 
@@ -111,7 +112,12 @@ class TeaBot(commands.Bot):
         self.replies = Replies
         self.colorslist = ColorsList
         self.regex = Regex
-        self.start_time = datetime.now(tz=IST)
+        self.start_time = datetime.now(tz=self.IST)
+        self.IST = pytz.timezone("Asia/Kolkata")
+        self.channel_input = channel_input
+        self.role_input = role_input
+        self.integer_input = integer_input
+        self.safe_delete = safe_delete
         # self. = str
         asyncio.get_event_loop().run_until_complete(self.init_db())
         for extension in extensions:
