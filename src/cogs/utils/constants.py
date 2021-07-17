@@ -14,8 +14,8 @@ premium_perks = {
     "TagCheck": ["4", "Unlimited"],
     "EasyTags": ["2", "Unlimited"],
     "Autorole": ["1", "Unlimited"],
-    "Custom Footer": ["❌", "✅"],
-    "Custom Color": ["❌", "✅"],
+    # "Custom Footer": ["❌", "✅"],
+    # "Custom Color": ["❌", "✅"],
     "Giveaway": ["5", "Unlimited"],
     "Ptable Setup": ["2", "Unlimited"],
     "Edit Ptable Watermark": ["❌", "✅"],
@@ -179,4 +179,3 @@ class Regex():
     r"([a-zA-Z0-9\-]+)",                              # the invite code itself
     flags=re.IGNORECASE
 )
-
