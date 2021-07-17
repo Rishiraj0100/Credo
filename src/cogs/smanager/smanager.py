@@ -1,14 +1,14 @@
 import discord,re,json,asyncio
 from discord.ext import commands
 from models import *
-from .menus import CustomEditMenu,DaysEditorMenu
+from .menus import *
 from .sutils import *
+from .convertors import *
 from ..utils.paginitators import Pages
 from datetime import datetime
 from ..utils.confirmater import ConfirmationPrompt
 from .events import EsportsListners
-from ..utils import expectations
-from pytz import timezone
+from ..utils import expectations,checks
 
 
 
@@ -16,7 +16,8 @@ class Esports(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    """Handles the bot's esports configuration system.
+    """
+    Handles the bot's esports configuration system.
     """
 
     @commands.group(invoke_without_command = True,aliases = ['s','sm','scirms-manager'])
@@ -24,80 +25,30 @@ class Esports(commands.Cog):
         """
         Handles The SManager Settings For This Guild
         """
-        if ctx.invoked_subcommand is None:
-            await ctx.send_help(ctx.command)
+        await ctx.send_help(ctx.command)
 
+                            
     @smanager.command(name='setup')
-    # @is_bot_setuped()
-    @commands.has_permissions(administrator=True)
+    @checks.can_use_sm()
     @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
-    @commands.bot_has_permissions(manage_channels=True,manage_roles=True)
     async def smanager_setup(self,ctx):
-        '''
-        Setups The Tea Bot Scrims Manager In Your Server
-        '''
-        data = await GuildData.get(guild_id=ctx.guild.id)
-        if data.is_bot_setuped == False:
-            raise expectations.NotSetup
-        if data.scrims_manager == False:
-            confirmation = ConfirmationPrompt(ctx,self.bot.color)
-            await confirmation.confirm(title = 'Are You Sure?',description = f'This Action will Create 2 Roles And 1 Channel')
-            if confirmation.confirmed:
-                await confirmation.update(description = f'{ctx.emote.loading} | Setting Up Scrims Manager')
-                guild=ctx.guild
-                permissions = discord.Permissions(send_messages=True, read_messages=True,administrator=True)
-                sm_role = await guild.create_role(name='teabot-smanger',permissions=permissions,colour=self.bot.color)
-                sm_banned_role = await guild.create_role(name='teabot-sm-banned')
-                guild = ctx.guild
-                member = ctx.author
-                overwrites = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                guild.me: discord.PermissionOverwrite(read_messages=True,send_messages=True),
-                member: discord.PermissionOverwrite(read_messages=True,send_messages=True),
-                sm_role:discord.PermissionOverwrite(read_messages=True,send_messages=True)
-            }
-                smlogchannel = await guild.create_text_channel('teabot-sm-logs', overwrites=overwrites)
-                try:
-                    await ctx.author.add_roles(sm_role)
-                except:
-                    pass
-                else:
-                    data.update(scrims_manager = True)
-
-                slot_embed = discord.Embed(title = "🛠️Scrims Manager Logs🛠️",description = f"If events related to scrims i.e opening registrations or adding roles , etc are triggered, then they will be logged in this channel. Also I have created {sm_role.mention}, you can give that role to your scrims-moderators. User with {sm_role.mention} can also send messages in registration channels and they won't be considered as scrims-registration.\n Note: Do not rename this channel.",color = self.bot.color)
-                smlogchannel_msg = await smlogchannel.send(embed=slot_embed)
-                await smlogchannel_msg.pin(reason = 'bcs its important')
-                await confirmation.update(
-                    description = f'''
-                                {ctx.emote.tick} | Created {sm_role.mention} Give This Role To Your Scrims Manager Who Manages The Scrims Note Don't Change Role Name Other Wise the Won't Able To Manage Scrims 
-                                \n{ctx.emote.tick} | Created {smlogchannel.mention} Channel To Log Scrimms Manager
-                                \n{ctx.emote.tick} | Created {sm_banned_role.mention} Give This Role To Banned Members From Scrims
-                                \n{ctx.emote.tick} | Successfully Setuped Scrims Manager Use `*smanager setup-custom` To See Avaible Custom Help
-                                ''')
-            else:
-                return await confirmation.update(description = 'not confirmed')
-        else:
-            await ctx.error(f'This Server Already Have Scrims Manager Setuped')
-
-
-    @smanager.command(name='setup-custom')
-    @commands.has_role('teabot-smanger')
-    # @is_smanager_setuped()
-    @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
-    async def smanager_setup_custom(self,ctx):
         """
-        Setups The Custom In Your Server
+        Setups The Scrims Manager In Your Server
         """
-
-        count = await ScrimData.filter(guild_id=ctx.guild.id).count()
         guild = await GuildData.get(guild_id=ctx.guild.id)
+        if guild.is_bot_setuped == False:
+            raise expectations.NotSetup
+        count = await ScrimData.filter(guild_id=ctx.guild.id).count()
 
         if count >= 7 and not guild.is_guild_premium:
             await ctx.error("You Can't Create More The 7 Customs")
             return
 
-        def check(msg):
-            return msg.author == ctx.author and ctx.channel == msg.channel
+        def check(message: discord.Message):
+            if message.content.strip().lower() == "cancel":
+                raise expectations.InputError("Alright, reverting all process.")
+
+            return message.author == ctx.author and ctx.channel == message.channel
         scrim = ScrimData(
             guild_id=ctx.guild.id
         )
@@ -105,143 +56,39 @@ class Esports(commands.Cog):
         q1 = discord.Embed(description = f'🛠️ Ok,Lets Start You Will Get 80 Seconds To Answer Each Question \nQ1. What Should Be The Channel Where I Will Send Slot List?',color = self.bot.color)
         q1.set_footer(text = f'**Type `{ctx.prefix}cancel` To Cancel Setup Any Time**')
         await ctx.send(embed = q1)
-        try:
-            slot_channel = await self.bot.wait_for('message', timeout=80.0, check=check)
-        except asyncio.TimeoutError:
-            return await ctx.error('You took long. Goodbye.')
-        else:
-            if slot_channel.content == f'{ctx.prefix}cancel':
-                return await ctx.send('Aborting.')
-            if len(slot_channel.channel_mentions) == 0 or len(slot_channel.channel_mentions) > 1:
-                return await ctx.error('You Did Not Mentioned Correct Channel Please Try Agin By Running Same Command')
-            try:
-                fetched_slot_channel = await commands.TextChannelConverter().convert(ctx,slot_channel.content)
-            except:
-                return await ctx.error('You Did Not Mentioned Correct Channel Please Try Agin By Running Same Command')
-            else:
-                if not fetched_slot_channel.permissions_for(ctx.me).read_messages:
-                    await ctx.error(
-                    f"Unfortunately, I don't have read messages permissions in {fetched_slot_channel.mention}."
-                    )
-                    return
-            
-                if not fetched_slot_channel.permissions_for(ctx.me).send_messages:
-                    await ctx.error(
-                    f"Unfortunately, I don't have send messages permissions in {fetched_slot_channel.mention}."
-                    )
-
-                    return
-
-                scrim.slotlist_ch = fetched_slot_channel.id
+        slot_channel = self.bot.channel_input(ctx,check,80,True)
+        scrim.slotlist_ch = slot_channel.id
 
 # question 2
-        q2 = discord.Embed(description = f'🛠️ Sweet! Slotlist Will Be Uploaded In {fetched_slot_channel.mention} \nQ2. What Should Be The Registration Channel Where I WIll Accept Registration?',color=self.bot.color)
+        q2 = discord.Embed(description = f'🛠️ Sweet! Slotlist Will Be Uploaded In {slot_channel.mention} \nQ2. What Should Be The Registration Channel Where I WIll Accept Registration?',color=self.bot.color)
         q2.set_footer(text = f'**Type `{ctx.prefix}cancel` To Cancel Setup Any Time**')
         await ctx.send(embed = q2)
-        try:
-            reg_channel = await self.bot.wait_for('message', timeout=80.0, check=check)
-        except asyncio.TimeoutError:
-            return await ctx.error('You took long. Goodbye.')
-        else:
+        reg_channel = self.bot.channel_input(ctx,check,80,True)
+        if await ScrimData.filter(reg_ch=reg_channel.id).count():
+            return await ctx.error("This channel is already a registration channel.")
+        scrim.reg_ch = reg_channel.id
 
-            if reg_channel.content == f'{ctx.prefix}cancel':
-                return await ctx.send('Aborting.')
-            if len(reg_channel.channel_mentions) == 0 or len(reg_channel.channel_mentions) > 1:
-                return await ctx.error('You Did Not Mentioned Correct Channel Please Try Agin By Running Same Command')
-            try:
-                fetched_reg_channel = await commands.TextChannelConverter().convert(ctx,reg_channel.content)
-            except:
-                return await ctx.error('You Did Not Mentioned Correct Channel Please Try Agin By Running Same Command')
-            else:
-                if await ScrimData.filter(reg_ch=fetched_reg_channel.id).count():
-                    await ctx.error("This channel is already a registration channel.")
-                if not fetched_reg_channel.permissions_for(ctx.me).read_messages:
-                    await ctx.error(
-                    f"Unfortunately, I don't have read messages permissions in {fetched_reg_channel.mention}."
-                    )
-                    return
-            
-                if not fetched_reg_channel.permissions_for(ctx.me).send_messages:
-                    await ctx.error(
-                    f"Unfortunately, I don't have send messages permissions in {fetched_reg_channel.mention}."
-                    )
-                    return
-                
-                scrim.reg_ch = fetched_reg_channel.id
 # question 3
-        q3 = discord.Embed(description = f'🛠️ Ok! I Will Accept Registration In {fetched_reg_channel.mention} \nQ3. which role should I give for correct registration?',color=self.bot.color)
+        q3 = discord.Embed(description = f'🛠️ Ok! I Will Accept Registration In {reg_channel.mention} \nQ3. which role should I give for correct registration?',color=self.bot.color)
         q3.set_footer(text = f'**Type `{ctx.prefix}cancel` To Cancel Setup Any Time**')
         await ctx.send(embed = q3)
-        try:
-            succes_reg_role = await self.bot.wait_for('message', timeout=80.0, check=check)
-        except asyncio.TimeoutError:
-            return await ctx.error('You took long. Goodbye.')
-
-        if succes_reg_role.content == f'{ctx.prefix}cancel':
-            return await ctx.send('Aborting.')
-
-        if len(succes_reg_role.role_mentions) == 0 or len(succes_reg_role.role_mentions) > 1:
-            return await ctx.error('You Did Not Mentioned Correct Role Please Try Agin By Running Same Command')
-        try:
-            fetched_succes_reg_role = await commands.RoleConverter().convert(ctx,succes_reg_role.content)
-        except:
-            return await ctx.error('You Did Not Mentioned Correct Role Please Try Agin By Running Same Command')
-        else:
-            if fetched_succes_reg_role.managed:
-                return await ctx.error(f"Role is an integrated role and cannot be added manually.")
-            if fetched_succes_reg_role > ctx.me.top_role:
-                await ctx.error(
-                    f"The position of {fetched_succes_reg_role.mention} is above my top role. So I can't give it to anyone.\nKindly move {ctx.me.top_role.mention} above {fetched_succes_reg_role.mention} in Server Settings."
-                )
-                self.stop()
-                return
-
-            if ctx.author.id != ctx.guild.owner_id:
-                if fetched_succes_reg_role > ctx.author.top_role:
-                    await ctx.error(
-                        f"The position of {fetched_succes_reg_role.mention} is above your top role {ctx.author.top_role.mention}."
-                    )
-                    self.stop()
-                    return
-            
-            scrim.correct_reg_role = fetched_succes_reg_role.id
+        reg_role = self.bot.role_input(ctx,check,80,True)
+        scrim.correct_reg_role = reg_role.id
 # question 4
-        q4 = discord.Embed(description = f'🛠️ Sweet! So I Will give This Role {fetched_succes_reg_role.mention} For Correct Registration \nQ4. How many total slots do you have? **Note: Maximum Nuber Of Slots Is `25`** ',color=self.bot.color)
+        q4 = discord.Embed(description = f'🛠️ Sweet! So I Will give This Role {reg_role.mention} For Correct Registration \nQ4. How many total slots do you have? **Note: Maximum Nuber Of Slots Is `25`** ',color=self.bot.color)
         q4.set_footer(text = f'**Type `{ctx.prefix}cancel` To Cancel Setup Any Time**')
         await ctx.send(embed = q4)
-        try:
-            total_num_slots = await self.bot.wait_for('message', timeout=80.0, check=check)
-        except asyncio.TimeoutError:
-            return await ctx.error('You took long. Goodbye.')
-
-        if total_num_slots.content == f'{ctx.prefix}cancel':
-            return await ctx.send('Aborting.')
-        if not total_num_slots.content.isdigit():
-            return await ctx.error(f'You Did Not Entered A Integer Please Try Agin By Running Same Command')
-        
-        int_converted_total_num_slots = int(total_num_slots.content)
-        if int_converted_total_num_slots > 30:
-            return await ctx.error(f'You Entered Slots Number More Than `30` \n**Note: Maximum Nuber Of Slots Is `30`**')
-
-        scrim.num_slots = int_converted_total_num_slots
+        slots = self.bot.integer_input(ctx,check,80,True,limits=(2, 30))
+        scrim.num_slots = slots
 
 # question 5
-        q5 = discord.Embed(description = f'🛠️ Ok! total num of slots is {int_converted_total_num_slots}  No Of Slots \nQ5. What are the minimum number of mentions for correct registration?',color=self.bot.color)
+        q5 = discord.Embed(description = f'🛠️ Ok! total num of slots is {slots}  No Of Slots \nQ5. What are the minimum number of mentions for correct registration?',color=self.bot.color)
         q5.set_footer(text = f'**Type `{ctx.prefix}cancel` To Cancel Setup Any Time**')
         await ctx.send(embed = q5)
-        try:
-            minimum_mentions_for_reg = await self.bot.wait_for('message', timeout=80.0, check=check)
-        except asyncio.TimeoutError:
-            return await ctx.error('You took long. Goodbye.')
-
-        if minimum_mentions_for_reg.content == f'{ctx.prefix}cancel':
-            return await ctx.send('Aborting.')
-        if not minimum_mentions_for_reg.content.isdigit():
-            return await ctx.error(f'You Did Not Entered A Integer Please Try Agin By Running Same Command')
-        int_minimum_mentions_for_reg = int(minimum_mentions_for_reg.content)
-        scrim.allowed_slots = int_minimum_mentions_for_reg
+        mentions = self.bot.integer_input(ctx,check,80,True,limits=(1, None))
+        scrim.allowed_slots = mentions
 # question 6
-        q6 = discord.Embed(description = f'🛠️ Sweet! So I Will Only Accept Registration If There Will {int_minimum_mentions_for_reg}  No Of Mentions \nQ6. At What Time I Should Open Registration Please Write Time In 24 Hours Format EX:`15:00` And Bot Only Support IST Time Zone',color=self.bot.color)
+        q6 = discord.Embed(description = f'🛠️ Sweet! So I Will Only Accept Registration If There Will {mentions}  No Of Mentions \nQ6. At What Time I Should Open Registration Please Write Time In 24 Hours Format EX:`15:00` And Bot Only Support IST Time Zone',color=self.bot.color)
         q6.set_footer(text = f'**Type `{ctx.prefix}cancel` To Cancel Setup Any Time**')
         await ctx.send(embed = q6)
         try:
@@ -249,8 +96,6 @@ class Esports(commands.Cog):
         except asyncio.TimeoutError:
             return await ctx.error('You took long. Goodbye.')
 
-        if reg_open_time.content == f'{ctx.prefix}cancel':
-            return await ctx.send('Aborting.')
         match = re.match(r"\d+:\d+", reg_open_time.content)
         if not match:
             return await ctx.error(f'Thats Not A Valid Time')
@@ -271,19 +116,16 @@ class Esports(commands.Cog):
         except asyncio.TimeoutError:
             return await ctx.error('You took long. Goodbye.')
 
-        if custom_name.content == f'{ctx.prefix}cancel':
-            return await ctx.send('Aborting.')
-
         scrim.custom_title = custom_name.content
 # finals
         confirmation = ConfirmationPrompt(ctx, self.bot.color)
         fields = (
             f"> Custom Name: {custom_name.content}",
-            f"> Slot List Channel: {fetched_slot_channel.mention}",
-            f"> Registration Channel: {fetched_reg_channel.mention}",
-            f"> Success Registration Role: {fetched_succes_reg_role.mention}",
-            f"> Total Num Of Slots: `{int_converted_total_num_slots}`",
-            f"> Minumu Mentions Required: `{int_minimum_mentions_for_reg}`",
+            f"> Slot List Channel: {slot_channel.mention}",
+            f"> Registration Channel: {reg_channel.mention}",
+            f"> Success Registration Role: {reg_role.mention}",
+            f"> Total Num Of Slots: `{slots}`",
+            f"> Minimum Mentions Required: `{mentions}`",
             f"> Registration Open Time: `{reg_open_final_time}`"
         )
         await confirmation.confirm(
@@ -293,23 +135,52 @@ class Esports(commands.Cog):
         if confirmation.confirmed:
             await confirmation.update(description = f'{ctx.emote.loading} | Setting Up Custom')
             scrim.is_registration_done_today = False
-            if reg_open_final_time <= datetime.now(timezone("Asia/Kolkata")).time():
+            if reg_open_final_time <= datetime.now(self.bot.IST).time():
                 scrim.is_registration_done_today = True
             await scrim.save()
             guild_data = GuildData.get(guild_id = ctx.guild.id)
             if guild_data.scrims_manager == False:
                 await guild_data.update(scrims_manager = True)
-            await confirmation.update(description=f"{ctx.emote.tick} | The Custom Has Been Setuped Successfully, The Scrims Id = `{scrim.c_id}`")
+            scrims_mod = discord.utils.get(ctx.guild.roles, name="credo-smanager")
+
+            if scrims_mod is None:
+                permissions = discord.Permissions(send_messages=True, read_messages=True,administrator=True)
+                scrims_mod = await guild.create_role(name='credo-smanager',permissions=permissions,colour=self.bot.color)
+            scrims_ban = discord.utils.get(ctx.guild.roles, name="credo-smanager")
+            if scrims_ban is None:
+                sm_banned_role = await guild.create_role(name='credo-sm-banned')
+
+            scrims_log_channel = discord.utils.get(ctx.guild.text_channels, name="credo-sm-logs")
+            member = ctx.author
+            if scrims_log_channel is None:
+                overwrites = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                guild.me: discord.PermissionOverwrite(read_messages=True,send_messages=True),
+                member: discord.PermissionOverwrite(read_messages=True,send_messages=True),
+                scrims_mod:discord.PermissionOverwrite(read_messages=True,send_messages=True)
+            }
+                smlogchannel = await guild.create_text_channel('credo-sm-logs', overwrites=overwrites)
+                note = discord.Embed(title = ':tools:Scrims Manager Logs:tools:', description = f'''
+                If events related to scrims i.e opening registrations or adding roles , etc are triggered, then they will be logged in this channel. Also I have created {scrims_mod.mention}, you can give that role to your scrims-moderators. User with {scrims_mod.mention} can also send messages in registration channels and they won't be considered as scrims-registration.
+                Note: Do not rename this channel.
+                ''',color = self.bot.color)
+                await note.pin()
+
+            await confirmation.update(description=f"""{ctx.emote.tick} | The Scrims Manger Has Been Setuped Successfully, The Scrims Id = `{scrim.c_id}`\n\n
+            {ctx.emote.tick} | Created {scrims_mod.mention} Give This Role To Your Scrims Manager Who Manages The Scrims Note Don't Change Role Name Other Wise the Won't Able To Manage Scrims 
+            \n{ctx.emote.tick} | Created {smlogchannel.mention} Channel To Log Scrimms Manager
+            \n{ctx.emote.tick} | Created {sm_banned_role.mention} Give This Role To Banned Members From Scrims
+            """)
         else:
             await confirmation.update("Not confirmed", hide_author=True, color=0xff5555)
 
     @smanager.command(name='open')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def smanager_open(self,ctx,custom_id:ScrimConverter):
         """
         Manually Opens The Registration
         """
-        guild = GuildData.get(guild_id = ctx.guild.id)
+        guild = await GuildData.get(guild_id = ctx.guild.id)
         if guild.scrims_manager == False:
             raise expectations.ScrimsManagerNotSetup
 
@@ -333,13 +204,12 @@ class Esports(commands.Cog):
         await ctx.send(f'{ctx.emote.tick}')
 
     @smanager.command(name='close')
-    @commands.has_role('teabot-smanger')
-    # @is_smanager_setuped()
+    @checks.can_use_sm()
     async def smanager_close(self,ctx,custom_id:ScrimConverter):
         """
         Manually Closes The Rewgistration
         """
-        guild = GuildData.get(guild_id = ctx.guild.id)
+        guild = await GuildData.get(guild_id = ctx.guild.id)
         if guild.scrims_manager == False:
             raise expectations.ScrimsManagerNotSetup
 
@@ -361,11 +231,10 @@ class Esports(commands.Cog):
         await ctx.send(f'{self.bot.emote.tick}')
 
     @smanager.command(name='delete')
-    @commands.has_role('teabot-smanger')
-    # @is_smanager_setuped()
+    @checks.can_use_sm()
     async def smanager_delete(self,ctx,custom_id:ScrimConverter):
         """Deletes The Setuped Custom"""
-        guild = GuildData.get(guild_id = ctx.guild.id)
+        guild = await GuildData.get(guild_id = ctx.guild.id)
         if guild.scrims_manager == False:
             raise expectations.ScrimsManagerNotSetup
             
@@ -381,12 +250,12 @@ class Esports(commands.Cog):
 
 
     @smanager.command(name = 'toogle-custom')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def smanager_toggle_custom(self,ctx,custom_id:ScrimConverter):
         '''
         Toggle Scrims Manger Custom
         '''
-        guild = GuildData.get(guild_id = ctx.guild.id)
+        guild = await GuildData.get(guild_id = ctx.guild.id)
         if guild.scrims_manager == False:
             raise expectations.ScrimsManagerNotSetup
 
@@ -434,10 +303,10 @@ class Esports(commands.Cog):
 
     #======= open-message editor ===========#
     @smanager.command(name='edit-open-message')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def smanager_edit_open_message(self,ctx,custom_id:ScrimConverter):
         """Edits The Custom Open Message"""
-        guild = GuildData.get(guild_id = ctx.guild.id)
+        guild = await GuildData.get(guild_id = ctx.guild.id)
         if guild.scrims_manager == False:
             raise expectations.ScrimsManagerNotSetup
         
@@ -546,10 +415,10 @@ class Esports(commands.Cog):
 
     #======= close-message editor ===========#
     @smanager.command(name='edit-close-message')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def smanager_edit_close_message(self,ctx,*,custom_id:ScrimConverter):
         """Edits The Custom Close Message"""
-        guild = GuildData.get(guild_id = ctx.guild.id)
+        guild = await GuildData.get(guild_id = ctx.guild.id)
         if guild.scrims_manager == False:
             raise expectations.ScrimsManagerNotSetup
 
@@ -656,12 +525,12 @@ class Esports(commands.Cog):
 
 
     @smanager.command(name='send-slotslist')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def smanager_send_slotslist(self,ctx,*,custom_id:ScrimConverter):
         """
         Send's The Slotlist To Setuped Channel
         """
-        guild = GuildData.get(guild_id = ctx.guild.id)
+        guild = await GuildData.get(guild_id = ctx.guild.id)
         if guild.scrims_manager == False:
             raise expectations.ScrimsManagerNotSetup
 
@@ -683,7 +552,7 @@ class Esports(commands.Cog):
             await confirmation.update("Not confirmed", hide_author=True, color=0xff5555)
 
     @smanager.command(name='config')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def smanager_config(self,ctx):
         """See The Scrims Manager Configuration For This Server"""
         guild = await GuildData.get(guild_id = ctx.guild.id)
@@ -745,20 +614,24 @@ class Esports(commands.Cog):
             await ctx.send_help(ctx.command)
     
     @tag_check.command(name = 'set')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def tag_check_set(self,ctx,check_channel:discord.TextChannel,*,mentions_required:int):
         '''
         Setups The Tag Check In You Server
         '''
-        scrims_manager = await self.bot.db.fetchrow('SELECT * FROM server_configs WHERE guild_id = $1',ctx.guild.id)
-        if scrims_manager['scrims_manager'] == False:
+        guild = await GuildData.get(guild_id=ctx.guild.id)
+        if guild.is_bot_setuped == False:
+            raise expectations.NotSetup
+
+        count = await ScrimData.filter(guild_id=ctx.guild.id).count()
+
+        if count <= 0 and not guild.is_guild_premium:
             raise expectations.ScrimsManagerNotSetup
 
-        count = await TagCheck.filter(guild_id=ctx.guild.id).count()
-        guild = await GuildData.get(guild_id=ctx.guild.id)
+        tag_count = await TagCheck.filter(guild_id=ctx.guild.id).count()
 
-        if count >= 2 and not guild.is_guild_premium:
+        if tag_count >= 2 and not guild.is_guild_premium:
             await ctx.error("You Can't Set More The 2 Tag Checks")
             return
 
@@ -775,7 +648,7 @@ class Esports(commands.Cog):
         await ctx.success(f"succesfully setuped tag check in {check_channel.mention} and you tag check id is: `{tag_check.id}`")
 
     @tag_check.command(name='config')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def tag_check_config(self,ctx):
         """See The Tag CHeck Configuration For This Server"""
         guild = await GuildData.get(guild_id = ctx.guild.id)
@@ -804,7 +677,7 @@ class Esports(commands.Cog):
         await paginator.paginate()
 
     @tag_check.command(name = 'toggle')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def tag_check_toggle(self,ctx,tag_check_id:TagCheckConverter):
         '''
         Toggles This Tag Check
@@ -825,7 +698,7 @@ class Esports(commands.Cog):
             return
 
     @tag_check.command(name = 'delete')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def tag_check_delete(self,ctx,tag_check_id:TagCheckConverter):
         data = tag_check_id
         confirmation = ConfirmationPrompt(ctx, self.bot.color)
@@ -880,8 +753,11 @@ class Esports(commands.Cog):
         """
         Setups Easy tagging In Your Server
         """
-        count = await EasyTag.filter(guild_id=ctx.guild.id).count()
         guild = await GuildData.get(guild_id=ctx.guild.id)
+        if guild.is_bot_setuped == False:
+            raise expectations.NotSetup
+
+        count = await EasyTag.filter(guild_id=ctx.guild.id).count()
 
         if count >= 2 and not guild.is_guild_premium:
             await ctx.error("You Can't Set More The 2 Tag Checks")
