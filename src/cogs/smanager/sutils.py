@@ -2,7 +2,6 @@ from discord.ext import commands
 import discord,re,asyncio
 from contextlib import suppress
 from models import *
-import tortoise.exceptions
 from prettytable import PrettyTable,ORGMODE
 
 __all__ = (
@@ -11,10 +10,7 @@ __all__ = (
     "ScrimError",
     "safe_delete",
     "makeslotlist",
-    "ScrimConverter",
-    "EasyTagConverter",
     "already_reserved",
-    "TagCheckConverter",
     "available_to_reserve",
     "add_role_and_reaction",
     "delete_denied_message",
@@ -35,46 +31,6 @@ async def safe_delete(message):
     else:
         return True
 
-class ScrimConverter(commands.Converter, ScrimData):
-    async def convert(self, ctx, argument: str):
-        try:
-            argument = int(argument)
-        except ValueError:
-            pass
-        else:
-            try:
-                return await ScrimData.get(pk=argument, guild_id=ctx.guild.id)
-            except tortoise.exceptions.DoesNotExist:
-                pass
-
-        raise commands.BadArgument(f"This is not a valid Scrim ID.\n\nGet a valid ID with `{ctx.prefix}smanager config`")
-        
-class TagCheckConverter(commands.Converter, TagCheck):
-    async def convert(self, ctx, argument: str):
-        try:
-            argument = int(argument)
-        except ValueError:
-            pass
-        else:
-            try:
-                return await TagCheck.get(pk=argument, guild_id=ctx.guild.id)
-            except tortoise.exceptions.DoesNotExist:
-                pass
-
-        raise commands.BadArgument(f"This is not a valid TagCheck ID.\n\nGet a valid ID with `{ctx.prefix}tag_check config`")
-class EasyTagConverter(commands.Converter, EasyTag):
-    async def convert(self, ctx, argument: str):
-        try:
-            argument = int(argument)
-        except ValueError:
-            pass
-        else:
-            try:
-                return await EasyTag.get(pk=argument, guild_id=ctx.guild.id)
-            except tortoise.exceptions.DoesNotExist:
-                pass
-
-        raise commands.BadArgument(f"This is not a valid EasyTag ID.\n\nGet a valid ID with `{ctx.prefix}ez_tag config`")
 
 async def delete_denied_message(message: discord.Message, seconds=10):
     with suppress(discord.HTTPException, discord.NotFound, discord.Forbidden):
