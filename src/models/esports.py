@@ -26,16 +26,23 @@ class ScrimData(models.Model):
     available_slots = ArrayField(fields.IntField(), default=list)
     num_correct_mentions = fields.IntField(default = 1)
     correct_reg_role = fields.BigIntField()
-    ping_role = fields.BigIntField()
-    open_role = fields.BigIntField()
-    custom_title = fields.TextField(default="TeaBot-Scrims")
+    ping_role = fields.BigIntField(null=True)
+    open_role = fields.BigIntField(null=True)
+    custom_title = fields.TextField(default="Credo-Scrims")
 
     open_time = TimeWithoutTimeZoneField()
-    close_time = TimeWithoutTimeZoneField()
+    close_time = TimeWithoutTimeZoneField(null=True)
+    opened_at = fields.DatetimeField(null=True)
+    closed_at = fields.DatetimeField(null=True)
+    autoclean_time = TimeWithoutTimeZoneField(default = "00:15:00")
 
     is_registeration_done_today = fields.BooleanField(default=False)
     is_running = fields.BooleanField(default=False)
+    autoclean_done = fields.BooleanField(default=False)
     auto_clean = fields.BooleanField(default=False)
+
+    time_elapsed = fields.CharField(null=True, max_length=100)
+    show_time_elapsed = fields.BooleanField(default=True)
 
     open_on_sunday = fields.BooleanField(default=True)
     open_on_monday = fields.BooleanField(default=True)
@@ -172,7 +179,7 @@ class Tournament(models.Model):
 
     id = fields.BigIntField(pk=True, index=True)
     guild_id = fields.BigIntField()
-    tm_name = fields.CharField(max_length=200, default="TeaBot-tournament")
+    tm_name = fields.CharField(max_length=200, default="Credo-Tournament")
     registration_channel_id = fields.BigIntField(index=True)
     confirm_channel_id = fields.BigIntField()
     role_id = fields.BigIntField()
