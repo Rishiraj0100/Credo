@@ -23,7 +23,7 @@ class Esports(commands.Cog):
     @commands.group(invoke_without_command = True,aliases = ['s','sm','scirms-manager'])
     async def smanager(self,ctx):
         """
-        Handles The SManager Settings For This Guild
+        Handles The Credo Scrims Manager Settings For This Guild
         """
         await ctx.send_help(ctx.command)
 
@@ -714,7 +714,7 @@ class Esports(commands.Cog):
 ####################################################################################################################
 
     @commands.command(aliases=("idp",)) 
-    @commands.bot_has_permissions(embed_links=True, manage_messages=True)
+    @checks.can_use_sm()
     async def shareidp(self, ctx, room_id, room_password, map,ping_role: discord.Role = None):
         """
         Share Id/pass with embed.
@@ -747,7 +747,7 @@ class Esports(commands.Cog):
             await ctx.send_help(ctx.command)
 
     @easytag.command(name = 'set')
-    @commands.has_permissions(manage_guild = True)
+    @checks.can_use_sm()
     @commands.max_concurrency(number = 1,per = commands.BucketType.guild)
     async def easytag_set(self,ctx,channel:discord.TextChannel):
         """
@@ -775,7 +775,7 @@ class Esports(commands.Cog):
         await ctx.success(f"succesfully setuped easy tagg in {channel.mention} and you easy tag id is: `{easytag.id}`")
 
     @easytag.command(name='config')
-    @commands.has_permissions(manage_guild = True)
+    @checks.can_use_sm()
     async def easytag_config(self,ctx):
         """See The Easy Tag Configuration For This Server"""
         alleasytag = await EasyTag.filter(guild_id=ctx.guild.id).all()
@@ -801,7 +801,7 @@ class Esports(commands.Cog):
         await paginator.paginate()
         
     @easytag.command(name = 'toggle')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def easytag_toggle(self,ctx,easy_tag_id:EasyTagConverter):
         '''
         Toggles This Easy Tag
@@ -818,7 +818,7 @@ class Esports(commands.Cog):
             return
 
     @easytag.command(name = 'delete')
-    @commands.has_role('teabot-smanger')
+    @checks.can_use_sm()
     async def easytag_delete(self,ctx,easy_tag_id:EasyTagConverter):
         data = easy_tag_id
         confirmation = ConfirmationPrompt(ctx, self.bot.color)
@@ -832,6 +832,13 @@ class Esports(commands.Cog):
 ####################################################################################################################
 #===================================================== Tournament Manager =========================================#
 ####################################################################################################################
+
+    @commands.group(invoke_without_command = True,aliases = ['t','tm','tournament-manager'])
+    async def tmanager(self,ctx):
+        """
+        Handles The Credo Tournament Manger Settings For This Guild
+        """
+        await ctx.send_help(ctx.command)
 
 def setup(bot):
     bot.add_cog(Esports(bot))

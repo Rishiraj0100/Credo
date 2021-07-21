@@ -3,12 +3,17 @@ from . import emote,context,expectations
 
 __all__ = (
     "SMNotUsable",
-    "can_use_sm"
+    "TMNotUsable",
+    "can_use_sm",
+    "can_use_tm"
 )
 
 class SMNotUsable(expectations.Credoerror):
     def __init__(self):
         super().__init__(f"You need either the `credo-smanager` role or `manage_guild` permissions to use scrims manager.")
+class TMNotUsable(expectations.Credoerror):
+    def __init__(self):
+        super().__init__(f"You need either the `credo-tmanager` role or `manage_guild` permissions to use scrims manager.")
 
 # def is_bot_setuped():
 #     async def predicate(ctx):
@@ -47,5 +52,18 @@ def can_use_sm():
             return True
         else:
             raise SMNotUsable()
+
+    return commands.check(predicate)
+
+def can_use_tm():
+    """
+    Returns True if the user has manage roles or credo-tmanager role in the server.
+    """
+
+    async def predicate(ctx: context.Context):
+        if ctx.author.guild_permissions.manage_guild or "credo-tmanager" in (role.name.lower() for role in ctx.author.roles):
+            return True
+        else:
+            raise TMNotUsable()
 
     return commands.check(predicate)

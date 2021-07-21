@@ -46,9 +46,10 @@ class Owner_Commands(commands.Cog):
         """Load any extension"""
         try:
             self.bot.load_extension(f"cogs.{name}")
-            await ctx.send(f"{self.bot.emote.tick} | Loaded extension **{name}**")
         except Exception as e:
             return await ctx.send(traceback_maker(e))
+        else:
+            await ctx.send(f"{self.bot.emote.tick} | Loaded extension **{name}**")
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -58,17 +59,20 @@ class Owner_Commands(commands.Cog):
             self.bot.unload_extension(f"cogs.{name}")
         except Exception as e:
             return await ctx.send(traceback_maker(e))
-        await ctx.send(f"{self.bot.emote.tick} | Unloaded extension **{name}**")
+        else:
+            await ctx.send(f"{self.bot.emote.tick} | Unloaded extension **{name}**")
 
     @commands.command(hidden=True)
     @commands.is_owner()
     async def reload(self, ctx, name: str):
         """Reload any loaded extension."""
         try:
-            self.bot.reload_extension(f"cogs.{name}")
+            self.bot.unload_extension(f"cogs.{name}")
+            self.bot.load_extension(f"cogs.{name}")
         except Exception as e:
             return await ctx.send(traceback_maker(e))
-        await ctx.send(f"{self.bot.emote.tick} | Reloaded extension **{name}**")
+        else:
+            await ctx.send(f"{self.bot.emote.tick} | Reloaded extension **{name}**")
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -76,23 +80,6 @@ class Owner_Commands(commands.Cog):
         """Shutdown the bot"""
         await ctx.send(f"Shutting down the system ...")
         await self.bot.close()
-
-    @commands.command(hidden=True)
-    @commands.is_owner()
-    async def toogle(self, ctx, *, command):
-        try:
-            command = self.bot.get_command(command)
-
-            if command is None:
-                await ctx.send('I Cant Find The Command')
-            elif ctx.command == command:
-                await ctx.send('This Command Cannot Be Disabled')
-            else:
-                command.enabled = not command.enabled
-                ternary = 'enabled' if command.enabled else "disabled"
-                await ctx.send(f'The Command {command.qualified_name} Has Been  {ternary}')
-        except Exception as e:
-            return await ctx.send(traceback_maker(e))
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -142,6 +129,7 @@ class Owner_Commands(commands.Cog):
             "discord": discord,
             "commands": commands,
             "bot": self.bot,
+            "self.bot":self.bot,
             "ctx": ctx,
             "channel": ctx.channel,
             "author": ctx.author,
@@ -261,7 +249,7 @@ class Owner_Commands(commands.Cog):
     @commands.is_owner()
     async def brodcast(self,ctx,*,args):
         """
-        Brodcasts This Message To Guild Having Tea Bot Setup
+        Brodcasts This Message To Guild Having Credo Setup
         """
         channel_id = []
         record = await self.bot.db.fetch('SELECT channel_id FROM public.brodcast')   
@@ -274,7 +262,7 @@ class Owner_Commands(commands.Cog):
             channel = self.bot.get_channel(channels)
             to_send.append(channel)
             start = time.time()
-            em = discord.Embed(title = '📢 | Tea Bot Announcement | 📢',description=args,color=self.bot.color)
+            em = discord.Embed(title = '📢 | Credo Announcement | 📢',description=args,color=self.bot.color)
             em.set_author(name="TierGamerpy#0252",icon_url=ctx.author.avatar_url)
             try:
                 await channel.send(embed = em)
